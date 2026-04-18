@@ -1,472 +1,96 @@
 [
-  {
-    "node1": "P",
-    "node2": "XI.",
-    "capacity": 2670.3
-  },
-  {
-    "node1": "XVIII.",
-    "node2": "v19",
-    "capacity": 4878.2
-  },
-  {
-    "node1": "XVIII.",
-    "node2": "v18",
-    "capacity": 3644.6
-  },
-  {
-    "node1": "X.",
-    "node2": "IX.",
-    "capacity": 12900.9
-  },
-  {
-    "node1": "IX.",
-    "node2": "v14",
-    "capacity": 8991.7
-  },
-  {
-    "node1": "C",
-    "node2": "X.",
-    "capacity": 4503.4
-  },
-  {
-    "node1": "M",
-    "node2": "X.",
-    "capacity": 2612.5
-  },
-  {
-    "node1": "IX.",
-    "node2": "I.",
-    "capacity": 6269.8
-  },
-  {
-    "node1": "XI.",
-    "node2": "v16",
-    "capacity": 5901.7
-  },
-  {
-    "node1": "I.",
-    "node2": "v7",
-    "capacity": 11578.7
-  },
-  {
-    "node1": "II.",
-    "node2": "I.",
-    "capacity": 7057.1
-  },
-  {
-    "node1": "III.",
-    "node2": "v22",
-    "capacity": 20757.7
-  },
-  {
-    "node1": "v22",
-    "node2": "v21",
-    "capacity": 20757.7
-  },
-  {
-    "node1": "v21",
-    "node2": "IV.",
-    "capacity": 20757.7
-  },
-  {
-    "node1": "IV.",
-    "node2": "XVI.",
-    "capacity": 20757.7
-  },
-  {
-    "node1": "XVII.",
-    "node2": "IV.",
-    "capacity": 12672.7
-  },
-  {
-    "node1": "V.",
-    "node2": "v5",
-    "capacity": 7322.4
-  },
-  {
-    "node1": "v5",
-    "node2": "XVII.",
-    "capacity": 7322.4
-  },
-  {
-    "node1": "VI.",
-    "node2": "v3",
-    "capacity": 5034.8
-  },
-  {
-    "node1": "v3",
-    "node2": "v4",
-    "capacity": 5034.8
-  },
-  {
-    "node1": "v4",
-    "node2": "V.",
-    "capacity": 5034.8
-  },
-  {
-    "node1": "V.",
-    "node2": "VIII.",
-    "capacity": 1614.1
-  },
-  {
-    "node1": "J",
-    "node2": "VIII.",
-    "capacity": 3573.7
-  },
-    {
-    "node1": "37",
-    "node2": "VIII.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XVI.",
-    "node2": "v2",
-    "capacity": 27945.0
-  },
-  {
-    "node1": "v2",
-    "node2": "v1",
-    "capacity": 27945.0
-  },
-  {
-    "node1": "v1",
-    "node2": "1",
-    "capacity": 27945.0
-  },
-  {
-    "node1": "XII.",
-    "node2": "v9",
-    "capacity": 10516.7
-  },
-  {
-    "node1": "v9",
-    "node2": "v8",
-    "capacity": 10516.7
-  },
-  {
-    "node1": "v8",
-    "node2": "VI.",
-    "capacity": 10516.7
-  },
-  {
-    "node1": "VI.",
-    "node2": "15",
-    "capacity": 6207.4
-  },
-    {
-    "node1": "16",
-    "node2": "15",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XV.",
-    "node2": "XIV.",
-    "capacity": 11089.0
-  },
-  {
-    "node1": "XIV.",
-    "node2": "v13",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "v13",
-    "node2": "v12",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "v12",
-    "node2": "v11",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "v11",
-    "node2": "v10",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "v10",
-    "node2": "v20",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "v20",
-    "node2": "XII.",
-    "capacity": 14548.4
-  },
-  {
-    "node1": "XII.",
-    "node2": "XIII.",
-    "capacity": 5087.7
-  },
-  {
-    "node1": "XIII.",
-    "node2": "13",
-    "capacity": 1571.2
-  },
-  {
-    "node1": "XIII.",
-    "node2": "24",
-    "capacity": 1864.6
-  },
-  {
-    "node1": "13",
-    "node2": "25",
-    "capacity": 1381.1
-  },
-  {
-    "node1": "O",
-    "node2": "VII.",
-    "capacity": 1762.5
-  },
-  {
-    "node1": "N",
-    "node2": "VII.",
-    "capacity": 2529.9
-  },
-  {
-    "node1": "VII.",
-    "node2": "VI.",
-    "capacity": 3501.2
-  },
-  {
-    "node1": "1",
-    "node2": "2",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v1",
-    "node2": "38",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v2",
-    "node2": "L",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v19",
-    "node2": "6",
-    "capacity": 4878.2
-  },
-  {
-    "node1": "v18",
-    "node2": "v17",
-    "capacity": 3644.6
-  },
-  {
-    "node1": "v17",
-    "node2": "XI.",
-    "capacity": 3644.6
-  },
-  {
-    "node1": "v14",
-    "node2": "XV.",
-    "capacity": 8991.7
-  },
-  {
-    "node1": "v15",
-    "node2": "X.",
-    "capacity": 5901.7
-  },
-  {
-    "node1": "v15",
-    "node2": "v16",
-    "capacity": 5901.7
-  },
-  {
-    "node1": "v7",
-    "node2": "v6",
-    "capacity": 11578.7
-  },
-  {
-    "node1": "30",
-    "node2": "v6",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v7",
-    "node2": "31",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v6",
-    "node2": "III.",
-    "capacity": 11578.7
-  },
-  {
-    "node1": "K",
-    "node2": "XVI.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "H",
-    "node2": "III.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "F",
-    "node2": "II.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "G",
-    "node2": "II.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v21",
-    "node2": "33",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v22",
-    "node2": "34",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v5",
-    "node2": "32",
-    "capacity": "inf"
-  },
-  {
-    "node1": "I",
-    "node2": "V.",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v4",
-    "node2": "36",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v3",
-    "node2": "35",
-    "capacity": "inf"
-  },
-  {
-    "node1": "VI.",
-    "node2": "27",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v8",
-    "node2": "19",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v9",
-    "node2": "20",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XII.",
-    "node2": "3",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XIII.",
-    "node2": "17",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XIII.",
-    "node2": "18",
-    "capacity": "inf"
-  },
-  {
-    "node1": "13",
-    "node2": "14",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v20",
-    "node2": "28",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v10",
-    "node2": "21",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v11",
-    "node2": "22",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v12",
-    "node2": "26",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v13",
-    "node2": "23",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XIV.",
-    "node2": "E",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XIV.",
-    "node2": "29",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XV.",
-    "node2": "D",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v14",
-    "node2": "8",
-    "capacity": "inf"
-  },
-  {
-    "node1": "X.",
-    "node2": "12",
-    "capacity": "inf"
-  },
-  {
-    "node1": "X.",
-    "node2": "B",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v15",
-    "node2": "10",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v16",
-    "node2": "11",
-    "capacity": "inf"
-  },
-  {
-    "node1": "9",
-    "node2": "v17",
-    "capacity": "inf"
-  },
-  {
-    "node1": "4",
-    "node2": "v18",
-    "capacity": "inf"
-  },
-  {
-    "node1": "XVIII.",
-    "node2": "A",
-    "capacity": "inf"
-  },
-  {
-    "node1": "v19",
-    "node2": "5",
-    "capacity": "inf"
-  },
-  {
-    "node1": "6",
-    "node2": "7",
-    "capacity": "inf"
-  }
+  {"nodes": ["P", "XI."], "capacity": 2670.3},
+  {"nodes": ["XVIII.", "v19"], "capacity": 4878.2},
+  {"nodes": ["XVIII.", "v18"], "capacity": 3644.6},
+  {"nodes": ["X.", "IX."], "capacity": 12900.9},
+  {"nodes": ["IX.", "v14"], "capacity": 8991.7},
+  {"nodes": ["C", "X."], "capacity": 4503.4},
+  {"nodes": ["M", "X."], "capacity": 2612.5},
+  {"nodes": ["IX.", "I."], "capacity": 6269.8},
+  {"nodes": ["XI.", "v16"], "capacity": 5901.7},
+  {"nodes": ["I.", "v7"], "capacity": 11578.7},
+  {"nodes": ["II.", "I."], "capacity": 7057.1},
+  {"nodes": ["III.", "v22"], "capacity": 20757.7},
+  {"nodes": ["v22", "v21"], "capacity": 20757.7},
+  {"nodes": ["v21", "IV."], "capacity": 20757.7},
+  {"nodes": ["IV.", "XVI."], "capacity": 20757.7},
+  {"nodes": ["XVII.", "IV."], "capacity": 12672.7},
+  {"nodes": ["V.", "v5"], "capacity": 7322.4},
+  {"nodes": ["v5", "XVII."], "capacity": 7322.4},
+  {"nodes": ["VI.", "v3"], "capacity": 5034.8},
+  {"nodes": ["v3", "v4"], "capacity": 5034.8},
+  {"nodes": ["v4", "V."], "capacity": 5034.8},
+  {"nodes": ["V.", "VIII."], "capacity": 1614.1},
+  {"nodes": ["J", "VIII."], "capacity": 3573.7},
+  {"nodes": ["37", "VIII."], "capacity": "inf"},
+  {"nodes": ["XVI.", "v2"], "capacity": 27945.0},
+  {"nodes": ["v2", "v1"], "capacity": 27945.0},
+  {"nodes": ["v1", "1"], "capacity": 27945.0},
+  {"nodes": ["XII.", "v9"], "capacity": 10516.7},
+  {"nodes": ["v9", "v8"], "capacity": 10516.7},
+  {"nodes": ["v8", "VI."], "capacity": 10516.7},
+  {"nodes": ["VI.", "15"], "capacity": 6207.4},
+  {"nodes": ["16", "15"], "capacity": "inf"},
+  {"nodes": ["XV.", "XIV."], "capacity": 11089.0},
+  {"nodes": ["XIV.", "v13"], "capacity": 14548.4},
+  {"nodes": ["v13", "v12"], "capacity": 14548.4},
+  {"nodes": ["v12", "v11"], "capacity": 14548.4},
+  {"nodes": ["v11", "v10"], "capacity": 14548.4},
+  {"nodes": ["v10", "v20"], "capacity": 14548.4},
+  {"nodes": ["v20", "XII."], "capacity": 14548.4},
+  {"nodes": ["XII.", "XIII."], "capacity": 5087.7},
+  {"nodes": ["XIII.", "13"], "capacity": 1571.2},
+  {"nodes": ["XIII.", "24"], "capacity": 1864.6},
+  {"nodes": ["13", "25"], "capacity": 1381.1},
+  {"nodes": ["O", "VII."], "capacity": 1762.5},
+  {"nodes": ["N", "VII."], "capacity": 2529.9},
+  {"nodes": ["VII.", "VI."], "capacity": 3501.2},
+  {"nodes": ["1", "2"], "capacity": "inf"},
+  {"nodes": ["v1", "38"], "capacity": "inf"},
+  {"nodes": ["v2", "L"], "capacity": "inf"},
+  {"nodes": ["v19", "6"], "capacity": 4878.2},
+  {"nodes": ["v18", "v17"], "capacity": 3644.6},
+  {"nodes": ["v17", "XI."], "capacity": 3644.6},
+  {"nodes": ["v14", "XV."], "capacity": 8991.7},
+  {"nodes": ["v15", "X."], "capacity": 5901.7},
+  {"nodes": ["v15", "v16"], "capacity": 5901.7},
+  {"nodes": ["v7", "v6"], "capacity": 11578.7},
+  {"nodes": ["30", "v6"], "capacity": "inf"},
+  {"nodes": ["v7", "31"], "capacity": "inf"},
+  {"nodes": ["v6", "III."], "capacity": 11578.7},
+  {"nodes": ["K", "XVI."], "capacity": "inf"},
+  {"nodes": ["H", "III."], "capacity": "inf"},
+  {"nodes": ["F", "II."], "capacity": "inf"},
+  {"nodes": ["G", "II."], "capacity": "inf"},
+  {"nodes": ["v21", "33"], "capacity": "inf"},
+  {"nodes": ["v22", "34"], "capacity": "inf"},
+  {"nodes": ["v5", "32"], "capacity": "inf"},
+  {"nodes": ["I", "V."], "capacity": "inf"},
+  {"nodes": ["v4", "36"], "capacity": "inf"},
+  {"nodes": ["v3", "35"], "capacity": "inf"},
+  {"nodes": ["VI.", "27"], "capacity": "inf"},
+  {"nodes": ["v8", "19"], "capacity": "inf"},
+  {"nodes": ["v9", "20"], "capacity": "inf"},
+  {"nodes": ["XII.", "3"], "capacity": "inf"},
+  {"nodes": ["XIII.", "17"], "capacity": "inf"},
+  {"nodes": ["XIII.", "18"], "capacity": "inf"},
+  {"nodes": ["13", "14"], "capacity": "inf"},
+  {"nodes": ["v20", "28"], "capacity": "inf"},
+  {"nodes": ["v10", "21"], "capacity": "inf"},
+  {"nodes": ["v11", "22"], "capacity": "inf"},
+  {"nodes": ["v12", "26"], "capacity": "inf"},
+  {"nodes": ["v13", "23"], "capacity": "inf"},
+  {"nodes": ["XIV.", "E"], "capacity": "inf"},
+  {"nodes": ["XIV.", "29"], "capacity": "inf"},
+  {"nodes": ["XV.", "D"], "capacity": "inf"},
+  {"nodes": ["v14", "8"], "capacity": "inf"},
+  {"nodes": ["X.", "12"], "capacity": "inf"},
+  {"nodes": ["X.", "B"], "capacity": "inf"},
+  {"nodes": ["v15", "10"], "capacity": "inf"},
+  {"nodes": ["v16", "11"], "capacity": "inf"},
+  {"nodes": ["9", "v17"], "capacity": "inf"},
+  {"nodes": ["4", "v18"], "capacity": "inf"},
+  {"nodes": ["XVIII.", "A"], "capacity": "inf"},
+  {"nodes": ["v19", "5"], "capacity": "inf"},
+  {"nodes": ["6", "7"], "capacity": "inf"}
 ]
