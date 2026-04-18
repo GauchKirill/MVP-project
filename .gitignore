@@ -1,0 +1,42 @@
+# Виртуальное окружение
+.venv/
+venv/
+env/
+.env/
+virtualenv/
+
+# Python кэш и компилированные файлы
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Сгенерированные файлы
+genereted/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.temp
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Файлы окружения
+.env
+.env.local
+.env.*.local
+
+# Базы данных
+*.db
+*.sqlite
+*.sqlite3
