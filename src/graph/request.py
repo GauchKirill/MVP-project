@@ -1,16 +1,15 @@
-"""Модели для представления потоков."""
+"""Класс заявки от источника к потребителю."""
 
 from typing import List, Optional
-from graph.model import Node, Edge
+from .model import Node, Edge
 
 
-class Flow:
-    """Класс представляющий требуемый поток от источника к потребителю."""
+class Request:
+    """Заявка на передачу электроэнергии от источника к потребителю."""
     
-    def __init__(self, source: Node, consumer: Node, amount: float):
+    def __init__(self, source: Node, consumer: Node):
         self.source = source
         self.consumer = consumer
-        self.amount = amount
         self.paths: List[List[Edge]] = []  # список всех возможных путей
         
     def add_path(self, path: List[Edge]):
@@ -34,7 +33,7 @@ class Flow:
         return max(self.paths, key=len)
     
     def __str__(self) -> str:
-        return f"Flow({self.source.name} -> {self.consumer.name}, amount={self.amount})"
+        return f"Request({self.source.name} -> {self.consumer.name})"
     
     def __repr__(self) -> str:
         return self.__str__()

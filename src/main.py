@@ -1,8 +1,7 @@
 """Основной модуль для работы с графом электрической сети «Альфа»."""
 
 import json
-from graph import Graph, GraphView
-from flow import FlowTask
+from graph import Graph, GraphView, RequestRegistry
 
 SETTING_FOLDER: str = 'settings'
 EDGES_FILE: str = 'edges.json'
@@ -35,46 +34,45 @@ def main():
     load_edges(graph, f"{SETTING_FOLDER}/{EDGES_FILE}")
     print(f"✓ Граф загружен: {len(graph.nodes)} вершин, {len(graph.edges)} рёбер")
     
-    # 2. Создаём задачу и генерируем все пары источник-потребитель
+    # 2. Создаём реестр заявок и генерируем все пары источник-потребитель
     print("\n" + "=" * 60)
-    print("ГЕНЕРАЦИЯ ПАР ИСТОЧНИК-ПОТРЕБИТЕЛЬ")
+    print("ГЕНЕРАЦИЯ ЗАЯВОК (ВСЕ ПАРЫ ИСТОЧНИК-ПОТРЕБИТЕЛЬ)")
     print("=" * 60)
     
-    task = FlowTask(graph)
-    pairs_count = task.generate_all_pairs()
-    print(f"✓ Сгенерировано пар: {pairs_count}")
+    registry = RequestRegistry(graph)
+    requests_count = registry.generate_all_requests()
+    print(f"✓ Сгенерировано заявок: {requests_count}")
     
     # 3. Строим все возможные пути
     print("\n" + "=" * 60)
     print("ПОСТРОЕНИЕ ПУТЕЙ")
     print("=" * 60)
     
-    task.build_all_paths(max_depth=50)
+    registry.build_all_paths(max_depth=50)
     
     # 4. Статистика
     print("\n" + "=" * 60)
     print("СТАТИСТИКА")
     print("=" * 60)
     
-    stats = task.get_statistics()
+    stats = registry.get_statistics()
     print(f"Источников: {stats['total_sources']}")
     print(f"Потребителей: {stats['total_consumers']}")
-    print(f"Пар всего: {stats['total_flows']}")
-    print(f"Пар с путями: {stats['flows_with_paths']}")
-    print(f"Пар без путей: {stats['flows_without_paths']}")
+    print(f"Заявок всего: {stats['total_requests']}")
+    print(f"Заявок с путями: {stats['requests_with_paths']}")
+    print(f"Заявок без путей: {stats['requests_without_paths']}")
     
     # 5. Выводим сводку по всем путям
-    task.print_all_paths_summary(max_per_flow=3)
+    registry.print_all_paths_summary(max_per_request=3)
     
-    # 6. Пример детального вывода для одного потока (для отладки)
-    if task.flows:
-        # Выбираем поток с путями для примера
-        sample_flow = next((f for f in task.flows if f.paths), None)
-        if sample_flow:
+    # 6. Пример детального вывода для одной заявки (для отладки)
+    if registry.requests:
+        sample_request = next((req for req in registry.requests if req.paths), None)
+        if sample_request:
             print("\n" + "=" * 60)
-            print("ПРИМЕР ДЕТАЛЬНОГО ВЫВОДА ПУТЕЙ")
+            print("ПРИМЕР ДЕТАЛЬНОГО ВЫВОДА ПУТЕЙ ДЛЯ ЗАЯВКИ")
             print("=" * 60)
-            task.print_flow_paths(sample_flow, max_display=10)
+            registry.print_request_paths(sample_request, max_display=10)
     
     # 7. Визуализация графа (опционально)
     print("\n" + "=" * 60)
