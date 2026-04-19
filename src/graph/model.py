@@ -44,3 +44,15 @@ class Graph:
         edge = Edge(n1, n2, capacity)
         self.edges.append(edge)
         return edge
+
+    def get_node(self, name):
+        """Возвращает вершину по имени или None, если не найдена."""
+        return self.nodes.get(name)
+
+    def get_sources(self):
+        """Возвращает список всех вершин-источников (source)."""
+        return [node for node in self.nodes.values() if node.type == 'source']
+
+    def get_consumers(self):
+        """Возвращает список всех вершин-потребителей (consumer)."""
+        return [node for node in self.nodes.values() if node.type == 'consumer']

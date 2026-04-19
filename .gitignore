@@ -13,7 +13,7 @@ __pycache__/
 .Python
 
 # Сгенерированные файлы
-genereted/
+genereted/*
 
 # IDE
 .vscode/
