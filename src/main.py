@@ -2,11 +2,14 @@
 
 import json
 from graph import Graph, GraphView, RequestRegistry
+from solver import FlowsCreator, Solver
 
 SETTING_FOLDER: str = 'settings'
 EDGES_FILE: str = 'edges.json'
+FLOWS_FILE: str = 'flows.json'
 GENERETED_FOLDER: str = 'genereted'
 GRAPH_FILE: str = 'graph.html'
+SOLUTION_GRAPH_FILE: str = 'solution_graph.html'
 
 
 def load_edges(graph, filename):
@@ -36,51 +39,81 @@ def main():
     
     # 2. Создаём реестр заявок и генерируем все пары источник-потребитель
     print("\n" + "=" * 60)
-    print("ГЕНЕРАЦИЯ ЗАЯВОК (ВСЕ ПАРЫ ИСТОЧНИК-ПОТРЕБИТЕЛЬ)")
+    print("ГЕНЕРАЦИЯ ЗАЯВОК И ПОСТРОЕНИЕ ПУТЕЙ")
     print("=" * 60)
     
     registry = RequestRegistry(graph)
     requests_count = registry.generate_all_requests()
     print(f"✓ Сгенерировано заявок: {requests_count}")
-    
-    # 3. Строим все возможные пути
-    print("\n" + "=" * 60)
-    print("ПОСТРОЕНИЕ ПУТЕЙ")
-    print("=" * 60)
-    
     registry.build_all_paths(max_depth=50)
     
-    # 4. Статистика
+    # 3. Загружаем целевые потоки из flows.json
     print("\n" + "=" * 60)
-    print("СТАТИСТИКА")
+    print("ЗАГРУЗКА ЦЕЛЕВЫХ ПОТОКОВ")
     print("=" * 60)
+    creator = FlowsCreator(graph, registry)
+    instances = creator.create_from_file(f"{SETTING_FOLDER}/{FLOWS_FILE}")
+    print(f"✓ Загружено ненулевых потоков: {len(instances)}")
+    total_target = sum(inst.target_amount for inst in instances)
+    print(f"✓ Суммарная целевая мощность: {total_target:.2f} кВт")
     
-    stats = registry.get_statistics()
-    print(f"Источников: {stats['total_sources']}")
-    print(f"Потребителей: {stats['total_consumers']}")
-    print(f"Заявок всего: {stats['total_requests']}")
-    print(f"Заявок с путями: {stats['requests_with_paths']}")
-    print(f"Заявок без путей: {stats['requests_without_paths']}")
-    
-    # 5. Выводим сводку по всем путям
-    registry.print_all_paths_summary(max_per_request=3)
-    
-    # 6. Пример детального вывода для одной заявки (для отладки)
-    if registry.requests:
-        sample_request = next((req for req in registry.requests if req.paths), None)
-        if sample_request:
-            print("\n" + "=" * 60)
-            print("ПРИМЕР ДЕТАЛЬНОГО ВЫВОДА ПУТЕЙ ДЛЯ ЗАЯВКИ")
-            print("=" * 60)
-            registry.print_request_paths(sample_request, max_display=10)
-    
-    # 7. Визуализация графа (опционально)
+    # 4. Решение задачи градиентным спуском
     print("\n" + "=" * 60)
-    print("ВИЗУАЛИЗАЦИЯ")
+    print("ОПТИМИЗАЦИЯ РАСПРЕДЕЛЕНИЯ ПОТОКОВ")
     print("=" * 60)
+    solver = Solver(graph, learning_rate=0.05, max_iter=500, epsilon=1e-7, verbose=True)
+    solver.set_instances(instances)
+    result = solver.optimize()
     
+    if result['success']:
+        print(f"\n✓ Оптимизация завершена:")
+        print(f"  Итераций: {result['iterations']}")
+        print(f"  Финальная потеря: {result['final_loss']:.6f}")
+        print(f"  - штраф за превышение пропускной способности: {result['capacity_violation']:.6f}")
+        print(f"  - штраф за недопоставку: {result['demand_shortage']:.6f}")
+    else:
+        print("Ошибка оптимизации:", result.get('message'))
+        return
+    
+    # 5. Отчёт о доставке
+    print("\n" + "=" * 60)
+    print("ОТЧЁТ О ДОСТАВКЕ ЭНЕРГИИ")
+    print("=" * 60)
+    delivery = solver.get_delivery_report()
+    print(f"Всего заявлено: {delivery['total_requested']:.2f} кВт")
+    print(f"Доставлено: {delivery['total_delivered']:.2f} кВт")
+    print(f"Недопоставлено: {delivery['total_shortage']:.2f} кВт ({delivery['total_shortage']/delivery['total_requested']*100:.2f}%)")
+    
+    print("\nДетали по заявкам (первые 10):")
+    for item in delivery['items'][:10]:
+        print(f"  {item['source']} -> {item['consumer']}: "
+              f"заявлено {item['requested']:.2f}, доставлено {item['delivered']:.2f}, "
+              f"нехватка {item['shortage']:.2f} ({item['shortage_pct']:.1f}%)")
+    if len(delivery['items']) > 10:
+        print(f"  ... и ещё {len(delivery['items'])-10}")
+    
+    # 6. Отчёт о нарушениях пропускной способности
+    print("\n" + "=" * 60)
+    print("НАРУШЕНИЯ ПРОПУСКНОЙ СПОСОБНОСТИ")
+    print("=" * 60)
+    violations = solver.get_edge_violations()
+    if violations:
+        print(f"Рёбер с превышением: {len(violations)}")
+        for v in violations[:10]:
+            print(f"  {v['edge']}: capacity={v['capacity']:.2f}, flow={v['actual_flow']:.2f}, "
+                  f"excess={v['excess']:.2f} ({v['excess_pct']:.1f}%)")
+        if len(violations) > 10:
+            print(f"  ... и ещё {len(violations)-10}")
+    else:
+        print("Нет рёбер с превышением пропускной способности.")
+    
+    # 7. Визуализация результата
+    print("\n" + "=" * 60)
+    print("ВИЗУАЛИЗАЦИЯ РЕЗУЛЬТАТА")
+    print("=" * 60)
     view = GraphView(graph)
-    view.draw_pyvis(filename=f"{GENERETED_FOLDER}/{GRAPH_FILE}")
+    edge_loads = solver.get_edge_loads()
+    view.draw_with_loads(edge_loads, filename=f"{GENERETED_FOLDER}/{SOLUTION_GRAPH_FILE}")
     
     print("\n✓ Готово!")
 
