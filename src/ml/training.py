@@ -1,3 +1,5 @@
+"""Обучение нейросетевой модели."""
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -9,7 +11,6 @@ import time
 from .model import PathWeightNetwork
 from .loss import PowerFlowLoss, EdgeFlowCalculator
 from .feature_extractor import FeatureExtractor
-from .visualization import TrainingVisualizer
 
 
 class ModelTrainer:
@@ -18,11 +19,11 @@ class ModelTrainer:
     """
     
     def __init__(self,
-                model: PathWeightNetwork,
-                feature_extractor: FeatureExtractor,
-                edge_calculator: EdgeFlowCalculator,
-                loss_fn: PowerFlowLoss,
-                device: str = 'cpu'):
+                 model: PathWeightNetwork,
+                 feature_extractor: FeatureExtractor,
+                 edge_calculator: EdgeFlowCalculator,
+                 loss_fn: PowerFlowLoss,
+                 device: str = 'cpu'):
         
         self.model = model.to(device)
         self.feature_extractor = feature_extractor
@@ -58,19 +59,18 @@ class ModelTrainer:
             self.optimizer,
             mode='min',
             factor=0.5,
-            patience=scheduler_patience,
-            verbose=True
+            patience=scheduler_patience
         )
     
     def train(self,
-            train_features: np.ndarray,
-            train_demands: np.ndarray,
-            val_features: Optional[np.ndarray] = None,
-            val_demands: Optional[np.ndarray] = None,
-            epochs: int = 100,
-            batch_size: int = 32,
-            early_stopping_patience: int = 30,
-            verbose: bool = True) -> Dict:
+              train_features: np.ndarray,
+              train_demands: np.ndarray,
+              val_features: Optional[np.ndarray] = None,
+              val_demands: Optional[np.ndarray] = None,
+              epochs: int = 100,
+              batch_size: int = 32,
+              early_stopping_patience: int = 30,
+              verbose: bool = True) -> Dict:
         """
         Обучает модель.
         
@@ -153,24 +153,22 @@ class ModelTrainer:
         # Восстанавливаем лучшую модель
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
-            
-        visualizer = TrainingVisualizer(save_dir='genereted')
-        visualizer.plot_training_history(self.history, show=verbose)
         
         return self.history
     
-    def _run_epoch(self, 
-                loader: DataLoader, 
-                training: bool = True) -> Tuple[float, Dict[str, float]]:
+    def _run_epoch(self, loader: DataLoader, training: bool = True) -> Tuple[float, Dict[str, float]]:
         """
-        Прогоняет одну эпоху.
+        Прогоняет одну эпоху. Работает с нормализованными значениями.
         """
         total_loss = 0.0
         total_components = {}
         num_batches = 0
         
+        # Получаем нормализованные capacity
+        # Используем типичную сумму для нормализации
+        typical_sum = 50000.0  # примерная сумма всех demands + capacities
         edge_capacities = torch.FloatTensor(
-            self.feature_extractor.get_edge_capacities()
+            self.feature_extractor.get_edge_capacities_normalized(total_sum=typical_sum)
         ).to(self.device)
         
         for batch_features, batch_demands in loader:
@@ -180,13 +178,19 @@ class ModelTrainer:
             if training:
                 self.optimizer.zero_grad()
             
-            # Прямой проход
-            path_flows = self.model.predict_flows(batch_features, batch_demands)
+            # Прямой проход - веса уже в [0,1]
+            path_weights = self.model(batch_features)
             
-            # Вычисляем потоки на рёбрах
-            edge_flows = self.edge_calculator.compute_edge_flows(path_flows)
+            # Потоки = веса * demands (всё нормализовано)
+            path_flows = path_weights * batch_demands.unsqueeze(-1)
             
-            # Вычисляем функцию потерь
+            # Вычисляем потоки на рёбрах (нормализованные)
+            edge_flows = self.edge_calculator.compute_edge_flows_normalized(
+                path_flows, 
+                normalizer=typical_sum
+            )
+            
+            # Вычисляем функцию потерь (все значения нормализованы)
             loss, components = self.loss_fn(
                 path_flows=path_flows,
                 edge_flows=edge_flows,
@@ -211,7 +215,7 @@ class ModelTrainer:
         return avg_loss, avg_components
     
     def _log_epoch(self, epoch: int, train_loss: float, val_loss: float, 
-                components: Dict[str, float]):
+                   components: Dict[str, float]):
         """Логирует информацию об эпохе."""
         comp_str = ", ".join([f"{k}: {v:.4f}" for k, v in components.items()])
         print(f"Epoch {epoch:3d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")

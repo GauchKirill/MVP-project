@@ -1,3 +1,5 @@
+"""Модуль машинного обучения для оптимизации потокораспределения."""
+
 from .feature_extractor import FeatureExtractor
 from .data_generator import DataGenerator, PhysicsValidator
 from .model import PathWeightNetwork

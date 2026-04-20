@@ -1,3 +1,5 @@
+"""Функция потерь для обучения модели распределения потоков."""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,18 +10,12 @@ import numpy as np
 class PowerFlowLoss(nn.Module):
     """
     Функция потерь для оптимизации потокораспределения.
-    
-    Компоненты:
-    1. capacity_loss — штраф за превышение пропускной способности рёбер
-    2. demand_loss — штраф за недопоставку энергии
-    
-    Правило Кирхгофа (сохранение потока в узлах) выполняется автоматически,
-    так как потоки идут только по физически существующим путям.
+    Работает с нормализованными значениями в диапазоне [0, 1].
     """
     
     def __init__(self,
-        capacity_weight: float = 10.0,
-        demand_weight: float = 100.0):
+                 capacity_weight: float = 1.0,
+                 demand_weight: float = 1.0):
         """
         Args:
             capacity_weight: вес штрафа за превышение пропускной способности
@@ -34,27 +30,15 @@ class PowerFlowLoss(nn.Module):
         self.last_losses: Dict[str, float] = {}
     
     def forward(self,
-                path_flows: torch.Tensor,           # (batch, S, C, max_paths)
-                edge_flows: torch.Tensor,           # (batch, E)
-                demands: torch.Tensor,              # (batch, S, C)
-                edge_capacities: torch.Tensor,      # (E,)
-                path_lengths: Optional[torch.Tensor] = None,  # не используется
-                path_masks: Optional[torch.Tensor] = None     # не используется
+                path_flows: torch.Tensor,           # (batch, S, C, max_paths) - нормализованные
+                edge_flows: torch.Tensor,           # (batch, E) - нормализованные
+                demands: torch.Tensor,              # (batch, S, C) - нормализованные
+                edge_capacities: torch.Tensor,      # (E,) - нормализованные
+                path_lengths: Optional[torch.Tensor] = None,
+                path_masks: Optional[torch.Tensor] = None
                 ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
-        Вычисляет функцию потерь.
-        
-        Args:
-            path_flows: потоки по каждому пути (batch, S, C, max_paths)
-            edge_flows: суммарные потоки на рёбрах (batch, E)
-            demands: заявки (batch, S, C)
-            edge_capacities: пропускные способности рёбер (E,)
-            path_lengths: игнорируется (оставлен для совместимости)
-            path_masks: игнорируется (оставлен для совместимости)
-            
-        Returns:
-            total_loss: скалярное значение функции потерь
-            components: словарь с компонентами для логирования
+        Вычисляет функцию потерь на нормализованных значениях.
         """
         components = {}
         total_loss = torch.tensor(0.0, device=path_flows.device)
@@ -73,10 +57,10 @@ class PowerFlowLoss(nn.Module):
         total_loss = total_loss + loss_demand
         components['demand'] = loss_demand.item()
         
-        # Логируем дополнительные метрики (не влияют на градиент)
+        # Логируем дополнительные метрики (в нормализованных единицах)
         with torch.no_grad():
-            # Средняя загрузка рёбер
-            edge_utils = edge_flows / edge_capacities_expanded.clamp(min=1.0)
+            # Средняя загрузка рёбер (в долях от capacity)
+            edge_utils = edge_flows / edge_capacities_expanded.clamp(min=1e-8)
             components['avg_utilization'] = edge_utils.mean().item()
             
             # Доля доставленной энергии
@@ -100,15 +84,18 @@ class EdgeFlowCalculator:
     Вычисляет суммарные потоки на рёбрах на основе потоков по путям.
     """
     
-    def __init__(self, 
-        registry,  # RequestRegistry
-        feature_extractor):
+    def __init__(self, registry, feature_extractor):
+        """
+        Args:
+            registry: RequestRegistry с информацией о путях
+            feature_extractor: FeatureExtractor с информацией о рёбрах
+        """
         self.registry = registry
         self.extractor = feature_extractor
         
         # Строим маппинг: (s_idx, c_idx, path_idx) -> список индексов рёбер
         self.path_to_edges = self._build_path_to_edges_mapping()
-        
+    
     def _build_path_to_edges_mapping(self) -> Dict[Tuple[int, int, int], List[int]]:
         """
         Строит отображение из индекса пути в индексы рёбер.
@@ -143,8 +130,7 @@ class EdgeFlowCalculator:
         
         return mapping
     
-    def compute_edge_flows(self, 
-        path_flows: torch.Tensor) -> torch.Tensor:
+    def compute_edge_flows(self, path_flows: torch.Tensor) -> torch.Tensor:
         """
         Вычисляет суммарные потоки на рёбрах.
         
@@ -169,3 +155,19 @@ class EdgeFlowCalculator:
                 edge_flows[:, edge_idx] += flow
         
         return edge_flows
+    
+    def compute_edge_flows_normalized(self, 
+                                      path_flows: torch.Tensor,
+                                      normalizer: float = 1.0) -> torch.Tensor:
+        """
+        Вычисляет нормализованные потоки на рёбрах.
+        
+        Args:
+            path_flows: тензор (batch_size, S, C, max_paths) - нормализованные потоки
+            normalizer: нормировочный коэффициент
+            
+        Returns:
+            тензор (batch_size, E) с нормализованными суммарными потоками
+        """
+        # Просто вызываем обычный метод, т.к. path_flows уже нормализованы
+        return self.compute_edge_flows(path_flows)

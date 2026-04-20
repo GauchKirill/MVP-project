@@ -1,3 +1,5 @@
+"""Применение обученной модели для предсказания потоков."""
+
 import torch
 import numpy as np
 from typing import Dict, List, Tuple, Optional
@@ -14,11 +16,11 @@ class FlowPredictor:
     """
     
     def __init__(self,
-                model: PathWeightNetwork,
-                feature_extractor: FeatureExtractor,
-                edge_calculator: EdgeFlowCalculator,
-                device: str = 'cpu'):
-    
+                 model: PathWeightNetwork,
+                 feature_extractor: FeatureExtractor,
+                 edge_calculator: EdgeFlowCalculator,
+                 device: str = 'cpu'):
+        
         self.model = model.to(device)
         self.feature_extractor = feature_extractor
         self.edge_calculator = edge_calculator
@@ -29,25 +31,15 @@ class FlowPredictor:
     def predict(self, flows: Dict[str, Dict[str, float]]) -> Dict:
         """
         Предсказывает распределение потоков для заданных заявок.
-        
-        Args:
-            flows: словарь заявок вида {source: {consumer: demand}}
-            
-        Returns:
-            словарь с результатами:
-                - path_weights: веса путей (S, C, max_paths)
-                - path_flows: потоки по путям (S, C, max_paths)
-                - edge_flows: суммарные потоки на рёбрах (E,)
-                - edge_utilization: загрузка рёбер в %
-                - total_delivered: суммарно доставленная мощность
         """
         # Извлекаем признаки
         features = self.feature_extractor.extract_features(flows)
-        features_tensor = torch.FloatTensor([features]).to(self.device)
+        # Исправлено: создаем массив правильно
+        features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
         
         # Создаём матрицу заявок
         demands = self._create_demand_matrix(flows)
-        demands_tensor = torch.FloatTensor([demands]).to(self.device)
+        demands_tensor = torch.FloatTensor(demands).unsqueeze(0).to(self.device)
         
         # Предсказание
         with torch.no_grad():
@@ -110,7 +102,6 @@ class FlowPredictor:
     
     def save_results(self, results: Dict, filename: str):
         """Сохраняет результаты в JSON."""
-        # Конвертируем numpy массивы в списки для JSON
         serializable = {}
         for key, value in results.items():
             if isinstance(value, np.ndarray):

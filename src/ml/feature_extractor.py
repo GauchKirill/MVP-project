@@ -1,6 +1,14 @@
+"""Извлечение признаков для нейросетевой модели."""
+
 import numpy as np
 from typing import Dict, List, Tuple, Optional
-from ..graph import Graph, RequestRegistry, Request
+import sys
+import os
+
+# Добавляем родительскую директорию в путь
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from graph import Graph, RequestRegistry, Request
 
 
 class FeatureExtractor:
@@ -46,8 +54,8 @@ class FeatureExtractor:
         return max_paths
     
     def extract_features(self, 
-        flows: Dict[str, Dict[str, float]], 
-        normalize: bool = True) -> np.ndarray:
+                         flows: Dict[str, Dict[str, float]], 
+                         normalize: bool = True) -> np.ndarray:
         """
         Извлекает вектор признаков из данных о потоках.
         
@@ -63,7 +71,7 @@ class FeatureExtractor:
         # 1. Заполняем capacity рёбер (первые E признаков)
         for i, edge in enumerate(self.edges):
             if edge.capacity == float('inf'):
-                features[i] = 1.0  # inf → 1
+                features[i] = 1.0  # inf → 1 (максимальная возможная доля)
             else:
                 features[i] = edge.capacity
         
@@ -80,15 +88,15 @@ class FeatureExtractor:
                 flat_idx = offset + s_idx * self.C + c_idx
                 features[flat_idx] = demand
         
-        # 3. Нормализация
+        # 3. Нормализация - ВСЁ делим на сумму
         if normalize and features.sum() > 0:
             features = features / features.sum()
         
         return features
     
     def extract_batch_features(self, 
-                            flows_list: List[Dict], 
-                            normalize: bool = True) -> np.ndarray:
+                               flows_list: List[Dict], 
+                               normalize: bool = True) -> np.ndarray:
         """
         Извлекает признаки для батча сценариев.
         
@@ -154,3 +162,32 @@ class FeatureExtractor:
             caps[i] = edge.capacity if edge.capacity != float('inf') else 1e9
         return caps
     
+    def get_edge_capacities_normalized(self, total_sum: float = 1.0) -> np.ndarray:
+        """
+        Возвращает нормализованные пропускные способности рёбер.
+        Они соответствуют тому же масштабу, что и признаки.
+        
+        Args:
+            total_sum: примерная сумма всех значений для нормализации
+            
+        Returns:
+            numpy массив размера (E,) с нормализованными capacity
+        """
+        caps = np.zeros(self.E, dtype=np.float32)
+        
+        # Вычисляем общую сумму для нормализации
+        # Используем сумму всех capacity + total_sum (для учёта demands)
+        total_capacity_sum = 0.0
+        for edge in self.edges:
+            if edge.capacity != float('inf'):
+                total_capacity_sum += edge.capacity
+        
+        normalizer = total_capacity_sum + total_sum
+        
+        for i, edge in enumerate(self.edges):
+            if edge.capacity == float('inf'):
+                caps[i] = 1.0  # inf → максимальная доля
+            else:
+                caps[i] = edge.capacity / normalizer
+        
+        return caps

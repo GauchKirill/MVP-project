@@ -1,9 +1,9 @@
-# src/ml/data_generator.py
+"""Генерация синтетических данных для обучения нейросети."""
+
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from copy import deepcopy
 from scipy.stats import qmc
-
 
 class DataGenerator:
     """

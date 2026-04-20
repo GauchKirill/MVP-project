@@ -1,3 +1,5 @@
+"""Визуализация процесса обучения и результатов."""
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
