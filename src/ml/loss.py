@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Dict, List, Tuple, Optional
-import numpy as np
 
 
 class PowerFlowLoss(nn.Module):
@@ -30,46 +29,101 @@ class PowerFlowLoss(nn.Module):
         self.last_losses: Dict[str, float] = {}
     
     def forward(self,
-                path_flows: torch.Tensor,           # (batch, S, C, max_paths) - нормализованные
-                edge_flows: torch.Tensor,           # (batch, E) - нормализованные
-                demands: torch.Tensor,              # (batch, S, C) - нормализованные
-                edge_capacities: torch.Tensor,      # (E,) - нормализованные
+                path_flows: torch.Tensor,           # (batch, S, C, max_paths)
+                edge_flows: torch.Tensor,           # (batch, E)
+                demands: torch.Tensor,              # (batch, S, C)
+                edge_capacities: torch.Tensor,      # (E,)
                 path_lengths: Optional[torch.Tensor] = None,
                 path_masks: Optional[torch.Tensor] = None
                 ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
-        Вычисляет функцию потерь на нормализованных значениях.
+        Вычисляет функцию потерь с нормализацией относительно целевых значений.
+        
+        loss_capacity = Σ max(0, (flow - capacity) / capacity)²
+        loss_demand = Σ ((delivered - demand) / demand)²  для недопоставки
         """
         components = {}
         total_loss = torch.tensor(0.0, device=path_flows.device)
         
-        # 1. Capacity loss — штраф за превышение пропускной способности
+        # 1. Capacity loss — нормализованный штраф за превышение пропускной способности
         edge_capacities_expanded = edge_capacities.unsqueeze(0)  # (1, E)
-        capacity_violation = F.relu(edge_flows - edge_capacities_expanded)
-        loss_capacity = self.capacity_weight * (capacity_violation ** 2).mean()
+        
+        # Превышение в абсолютных величинах
+        capacity_violation = F.relu(edge_flows - edge_capacities_expanded)  # (batch, E)
+        
+        # Нормализация: делим на capacity (избегаем деления на 0)
+        normalized_violation = capacity_violation / edge_capacities_expanded.clamp(min=1e-8)
+        
+        # Квадрат относительного превышения, сумма по рёбрам для каждого сценария
+        violation_per_scenario = (normalized_violation ** 2).sum(dim=1)  # (batch,)
+        
+        # Среднее по батчу
+        loss_capacity = self.capacity_weight * violation_per_scenario.mean()
+        
         total_loss = total_loss + loss_capacity
         components['capacity'] = loss_capacity.item()
         
-        # 2. Demand loss — штраф за недопоставку
+        # 2. Demand loss — нормализованный штраф за недопоставку
         delivered = path_flows.sum(dim=-1)  # (batch, S, C)
-        shortage = F.relu(demands - delivered)
-        loss_demand = self.demand_weight * (shortage ** 2).mean()
+
+        # Недопоставка в абсолютных величинах
+        shortage = demands - delivered  # (batch, S, C)
+        
+        # Нормализация: делим на demand (избегаем деления на 0)
+        normalized_shortage = shortage / demands.clamp(min=1e-8)
+        
+        # Квадрат относительной недопоставки, сумма по всем парам (S*C) для каждого сценария
+        shortage_per_scenario = (normalized_shortage ** 2).sum(dim=(1, 2))  # (batch,)
+        
+        # Среднее по батчу
+        loss_demand = self.demand_weight * shortage_per_scenario.mean()
+        
         total_loss = total_loss + loss_demand
         components['demand'] = loss_demand.item()
         
-        # Логируем дополнительные метрики (в нормализованных единицах)
+        # Логируем дополнительные метрики
         with torch.no_grad():
-            # Средняя загрузка рёбер (в долях от capacity)
-            edge_utils = edge_flows / edge_capacities_expanded.clamp(min=1e-8)
-            components['avg_utilization'] = edge_utils.mean().item()
+            # # Средняя загрузка рёбер (в долях от capacity)
+            # edge_utils = edge_flows / edge_capacities_expanded.clamp(min=1e-8)
+            # components['avg_utilization'] = edge_utils.mean().item()
+             
+            # # Доля доставленной энергии
+            # total_demanded = demands.sum()
+            # total_delivered = delivered.sum()
+            # if total_demanded > 0:
+            #     components['delivery_ratio'] = (total_delivered / total_demanded).item()
+            # else:
+            #     components['delivery_ratio'] = 1.0
+            # Маска конечных рёбер (capacity < 1e8 считаем конечной)
+            finite_mask = edge_capacities < 1e8
+            
+            # Абсолютная загрузка рёбер (для информации)
+            if finite_mask.any():
+                edge_utils_finite = edge_flows[:, finite_mask] / edge_capacities[finite_mask].clamp(min=1e-8)
+                components['avg_utilization'] = edge_utils_finite.mean().item()
+                components['max_utilization'] = edge_utils_finite.max().item()
+                
+                # Максимальное относительное превышение (для отладки)
+                if (capacity_violation[:, finite_mask] > 0).any():
+                    max_relative_violation = normalized_violation[:, finite_mask].max().item()
+                    components['max_relative_violation'] = max_relative_violation
+            else:
+                components['avg_utilization'] = 0.0
+                components['max_utilization'] = 0.0
             
             # Доля доставленной энергии
-            total_demanded = demands.sum()
-            total_delivered = delivered.sum()
-            if total_demanded > 0:
-                components['delivery_ratio'] = (total_delivered / total_demanded).item()
-            else:
-                components['delivery_ratio'] = 1.0
+            total_demanded = demands.sum(dim=(1, 2))  # (batch,)
+            total_delivered = delivered.sum(dim=(1, 2))  # (batch,)
+            delivery_ratios = total_delivered / total_demanded.clamp(min=1e-8)
+            components['delivery_ratio'] = delivery_ratios.mean().item()
+            
+            # Средние значения нормализованных отклонений (для отладки)
+            components['avg_normalized_violation'] = normalized_violation.mean().item()
+            components['avg_normalized_shortage'] = normalized_shortage.mean().item()
+            
+            # Количество сценариев с нарушениями
+            components['scenarios_with_violation'] = (violation_per_scenario > 0).sum().item()
+            components['scenarios_with_shortage'] = (shortage_per_scenario > 0).sum().item()
         
         self.last_losses = components
         return total_loss, components

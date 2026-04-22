@@ -17,10 +17,10 @@ GRAPH_FILE: str = 'graph.html'
 
 # === НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ ===
 TRAINING_CONFIG = {
-    'num_samples': 200,        # количество сценариев для обучения (уменьшено для скорости)
+    'num_samples': 2000,        # количество сценариев для обучения (уменьшено для скорости)
     'batch_size': 32,           # размер батча
     'epochs': 50,               # максимальное количество эпох
-    'learning_rate': 1e-4,      # скорость обучения
+    'learning_rate': 3e-4,      # скорость обучения
     'early_stopping_patience': 15,  # терпение для ранней остановки
     'lhs_ratio': 0.3,           # доля LHS сэмплов
     'noise_std': 0.3,           # стандартное отклонение шума для вариаций
@@ -202,8 +202,8 @@ def train_model(graph, registry, config=None):
     # В train_model() при создании loss_fn:
     # Теперь веса имеют смысл относительной важности
     loss_fn = PowerFlowLoss(
-        capacity_weight=10.0,   # Перегрузка в 10 раз важнее недопоставки
-        demand_weight=1.0       # Базовая важность доставки
+        capacity_weight=1.0,
+        demand_weight=1e-6
     )
     
     # Обучаем модель

@@ -33,7 +33,7 @@ class FlowPredictor:
         Предсказывает распределение потоков для заданных заявок.
         """
         # Извлекаем признаки
-        features = self.feature_extractor.extract_features(flows)
+        features = self.feature_extractor.extract_features(flows, normalize=True)
         # Исправлено: создаем массив правильно
         features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
         

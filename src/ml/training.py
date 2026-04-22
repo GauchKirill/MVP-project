@@ -142,7 +142,7 @@ class ModelTrainer:
                 patience_counter += 1
             
             # Логирование
-            if verbose and (epoch % 10 == 0 or epoch == epochs - 1):
+            if verbose and (epoch % 3 == 0 or epoch == epochs - 1):
                 self._log_epoch(epoch, train_loss, val_loss, train_components)
             
             if patience_counter >= early_stopping_patience:
@@ -158,17 +158,15 @@ class ModelTrainer:
     
     def _run_epoch(self, loader: DataLoader, training: bool = True) -> Tuple[float, Dict[str, float]]:
         """
-        Прогоняет одну эпоху. Работает с нормализованными значениями.
+        Прогоняет одну эпоху.
         """
         total_loss = 0.0
         total_components = {}
         num_batches = 0
         
-        # Получаем нормализованные capacity
-        # Используем типичную сумму для нормализации
-        typical_sum = 50000.0  # примерная сумма всех demands + capacities
+        # Получаем реальные capacity в кВт
         edge_capacities = torch.FloatTensor(
-            self.feature_extractor.get_edge_capacities_normalized(total_sum=typical_sum)
+            self.feature_extractor.get_edge_capacities()
         ).to(self.device)
         
         for batch_features, batch_demands in loader:
@@ -176,21 +174,19 @@ class ModelTrainer:
             batch_demands = batch_demands.to(self.device)
             
             if training:
-                self.optimizer.zero_grad()
+                if self.optimizer:
+                    self.optimizer.zero_grad()
             
-            # Прямой проход - веса уже в [0,1]
+            # Прямой проход - получаем веса (коэффициенты от 0 до 1)
             path_weights = self.model(batch_features)
             
-            # Потоки = веса * demands (всё нормализовано)
+            # Потоки в кВт = веса * demands (demands уже в кВт)
             path_flows = path_weights * batch_demands.unsqueeze(-1)
             
-            # Вычисляем потоки на рёбрах (нормализованные)
-            edge_flows = self.edge_calculator.compute_edge_flows_normalized(
-                path_flows, 
-                normalizer=typical_sum
-            )
+            # Вычисляем потоки на рёбрах в кВт
+            edge_flows = self.edge_calculator.compute_edge_flows(path_flows)
             
-            # Вычисляем функцию потерь (все значения нормализованы)
+            # Вычисляем функцию потерь
             loss, components = self.loss_fn(
                 path_flows=path_flows,
                 edge_flows=edge_flows,
@@ -201,7 +197,8 @@ class ModelTrainer:
             if training:
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                self.optimizer.step()
+                if self.optimizer:
+                    self.optimizer.step()
             
             total_loss += loss.item()
             for key, value in components.items():

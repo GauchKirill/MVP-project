@@ -70,10 +70,7 @@ class FeatureExtractor:
         
         # 1. Заполняем capacity рёбер (первые E признаков)
         for i, edge in enumerate(self.edges):
-            if edge.capacity == float('inf'):
-                features[i] = 1.0  # inf → 1 (максимальная возможная доля)
-            else:
-                features[i] = edge.capacity
+            features[i] = edge.capacity
         
         # 2. Заполняем заявки (оставшиеся S*C признаков)
         offset = self.E
@@ -88,10 +85,19 @@ class FeatureExtractor:
                 flat_idx = offset + s_idx * self.C + c_idx
                 features[flat_idx] = demand
         
-        # 3. Нормализация - ВСЁ делим на сумму
-        if normalize and features.sum() > 0:
-            features = features / features.sum()
-        
+        # 3. Нормализация - ВСЁ делим на сумму конечных значений
+        if normalize:
+            # Суммируем только конечные значения
+            total_sum = 0.0
+            for i, val in enumerate(features):
+                if np.isfinite(val):
+                    total_sum += val
+            
+            if total_sum > 0:
+                features = features / total_sum
+                # Для inf значений устанавливаем 1.0
+                features[np.isinf(features)] = 1.0
+
         return features
     
     def extract_batch_features(self, 
@@ -105,7 +111,7 @@ class FeatureExtractor:
         """
         batch_features = np.zeros((len(flows_list), self.feature_dim), dtype=np.float32)
         for i, flows in enumerate(flows_list):
-            batch_features[i] = self.extract_features(flows, normalize=False)
+            batch_features[i] = self.extract_features(flows, normalize=True)
         
         # Нормализуем каждый сценарий отдельно
         if normalize:
@@ -153,41 +159,19 @@ class FeatureExtractor:
     def get_edge_capacities(self) -> np.ndarray:
         """
         Возвращает массив пропускных способностей всех рёбер.
-        
-        Returns:
-            numpy массив размера (E,)
+        Для inf оставляем np.inf (не 1e9).
         """
         caps = np.zeros(self.E, dtype=np.float32)
         for i, edge in enumerate(self.edges):
-            caps[i] = edge.capacity if edge.capacity != float('inf') else 1e9
+            caps[i] = edge.capacity if edge.capacity != float('inf') else np.inf
         return caps
     
-    def get_edge_capacities_normalized(self, total_sum: float = 1.0) -> np.ndarray:
+    def get_finite_mask(self) -> np.ndarray:
         """
-        Возвращает нормализованные пропускные способности рёбер.
-        Они соответствуют тому же масштабу, что и признаки.
-        
-        Args:
-            total_sum: примерная сумма всех значений для нормализации
-            
-        Returns:
-            numpy массив размера (E,) с нормализованными capacity
+        Возвращает булеву маску рёбер с конечной capacity.
         """
-        caps = np.zeros(self.E, dtype=np.float32)
-        
-        # Вычисляем общую сумму для нормализации
-        # Используем сумму всех capacity + total_sum (для учёта demands)
-        total_capacity_sum = 0.0
-        for edge in self.edges:
-            if edge.capacity != float('inf'):
-                total_capacity_sum += edge.capacity
-        
-        normalizer = total_capacity_sum + total_sum
-        
+        mask = np.ones(self.E, dtype=bool)
         for i, edge in enumerate(self.edges):
             if edge.capacity == float('inf'):
-                caps[i] = 1.0  # inf → максимальная доля
-            else:
-                caps[i] = edge.capacity / normalizer
-        
-        return caps
+                mask[i] = False
+        return mask

@@ -61,12 +61,14 @@ class PathWeightNetwork(nn.Module):
         self._init_weights()
     
     def _init_weights(self):
-        """Инициализация весов по Xavier."""
+        """Инициализация весов."""
         for module in self.modules():
             if isinstance(module, nn.Linear):
-                nn.init.xavier_uniform_(module.weight)
+                # Используем Kaiming инициализацию для ReLU
+                nn.init.kaiming_uniform_(module.weight, mode='fan_in', nonlinearity='relu')
                 if module.bias is not None:
-                    nn.init.zeros_(module.bias)
+                    # Инициализируем bias небольшими положительными значениями
+                    nn.init.constant_(module.bias, 0.01)
     
     def set_path_mask(self, mask: np.ndarray):
         """
