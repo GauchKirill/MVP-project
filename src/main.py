@@ -61,16 +61,15 @@ def main():
     print("\n" + "=" * 60)
     print("ОПТИМИЗАЦИЯ РАСПРЕДЕЛЕНИЯ ПОТОКОВ")
     print("=" * 60)
-    solver = Solver(graph, learning_rate=1e-3, max_iter=20000, epsilon=1e-7, verbose=True)
+    solver = Solver(graph, learning_rate=1e-3, max_iter=10000, epsilon=1e-2, verbose=True)
     solver.set_instances(instances)
     result = solver.optimize()
     
     if result['success']:
         print(f"\n✓ Оптимизация завершена:")
         print(f"  Итераций: {result['iterations']}")
-        print(f"  Финальная потеря: {result['final_loss']:.6f}")
-        print(f"  - штраф за превышение пропускной способности: {result['capacity_violation']:.6f}")
-        print(f"  - штраф за недопоставку: {result['demand_shortage']:.6f}")
+        print(f"  Суммарная недопоставка: {result['total_shortage']:.2f} кВт")
+        print(f"  Суммарное превышение пропускной способности: {result['capacity_violation']:.2f} кВт")
     else:
         print("Ошибка оптимизации:", result.get('message'))
         return
@@ -114,6 +113,9 @@ def main():
     view = GraphView(graph)
     edge_loads = solver.get_edge_loads()
     view.draw_with_loads(edge_loads, filename=f"{GENERETED_FOLDER}/{SOLUTION_GRAPH_FILE}")
+
+    # В конце main() добавьте:
+    solver.plot_training_history(filename=f"{GENERETED_FOLDER}/training_history.png")
     
     print("\n✓ Готово!")
 

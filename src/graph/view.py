@@ -109,9 +109,10 @@ class GraphView:
     def draw_with_loads(self, edge_loads: dict, filename="graph_with_loads.html"):
         """
         Визуализация графа с цветовой индикацией загрузки рёбер.
-        edge_loads: словарь {Edge: load_ratio (0..1)}
+        edge_loads: словарь {Edge: (flow, load_ratio)}
         """
         from pyvis.network import Network
+        import os
         
         net = Network(height="800px", width="100%", bgcolor="#ffffff")
         net.set_options("""
@@ -146,23 +147,25 @@ class GraphView:
         for edge in self.graph.edges:
             u, v = edge.nodes[0].name, edge.nodes[1].name
             cap = edge.capacity if edge.capacity != float('inf') else '∞'
-            load = edge_loads.get(edge, 0.0)
+            flow, load = edge_loads.get(edge, (0.0, 0.0))
             
-            # Определяем цвет ребра по загрузке
-            if load > 0.95:
-                color = '#e74c3c'  # красный
-            elif load > 0.85:
-                color = '#f39c12'  # оранжевый
-            elif load > 0.75:
-                color = '#f1c40f'  # желтый
+            # Определяем цвет ребра по загрузке (только если capacity не inf)
+            if edge.capacity == float('inf'):
+                color = '#888888'  # серый для бесконечной ёмкости
+                load_percent = 0.0
             else:
-                color = '#888888'  # серый
+                load_percent = load * 100
+                if load > 0.95:
+                    color = '#e74c3c'  # красный
+                elif load > 0.85:
+                    color = '#f39c12'  # оранжевый
+                elif load > 0.75:
+                    color = '#f1c40f'  # желтый
+                else:
+                    color = '#888888'  # серый
                 
-            # Вычисляем фактический поток для подсказки
-            flow = load * edge.capacity if edge.capacity != float('inf') else 0.0
-            
             net.add_edge(u, v,
-                        title=f"Пропускная способность: {cap} кВт<br>Поток: {flow:.2f} кВт<br>Загрузка: {load*100:.1f}%",
+                        title=f"Пропускная способность: {cap} кВт<br>Поток: {flow:.2f} кВт<br>Загрузка: {load_percent:.1f}%",
                         label=f"{flow:.1f}/{cap}" if edge.capacity != float('inf') else f"{flow:.1f}/∞",
                         color=color, width=2)
 
@@ -179,10 +182,12 @@ class GraphView:
             <span style="color: #e74c3c;">>95%</span><br>
             <span style="color: #f39c12;">>85%</span><br>
             <span style="color: #f1c40f;">>75%</span><br>
-            <span style="color: #888888;"><75%</span>
+            <span style="color: #888888;"><75% или ∞</span>
         </div>
         """
         html_content = html_content.replace('</body>', f'{legend_html}</body>')
+        
+        os.makedirs(os.path.dirname(filename) or '.', exist_ok=True)
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html_content)
         print(f"Граф с загрузкой сохранён в {filename}")
