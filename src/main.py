@@ -45,7 +45,7 @@ def main():
     registry = RequestRegistry(graph)
     requests_count = registry.generate_all_requests()
     print(f"✓ Сгенерировано заявок: {requests_count}")
-    registry.build_all_paths(max_depth=50)
+    registry.build_all_paths()
     
     # 3. Загружаем целевые потоки из flows.json
     print("\n" + "=" * 60)
@@ -61,7 +61,7 @@ def main():
     print("\n" + "=" * 60)
     print("ОПТИМИЗАЦИЯ РАСПРЕДЕЛЕНИЯ ПОТОКОВ")
     print("=" * 60)
-    solver = Solver(graph, learning_rate=0.05, max_iter=500, epsilon=1e-7, verbose=True)
+    solver = Solver(graph, learning_rate=1e-3, max_iter=20000, epsilon=1e-7, verbose=True)
     solver.set_instances(instances)
     result = solver.optimize()
     

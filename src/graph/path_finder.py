@@ -10,7 +10,7 @@ class PathFinder:
     def __init__(self, graph: Graph):
         self.graph = graph
     
-    def find_all_simple_paths(self, source: Node, target: Node, max_depth: int = 50) -> List[List[Edge]]:
+    def find_all_simple_paths(self, source: Node, target: Node) -> List[List[Edge]]:
         """
         Находит все простые пути (без циклов) от source до target.
         """
@@ -18,7 +18,7 @@ class PathFinder:
         visited_nodes: Set[str] = set()
         current_path: List[Edge] = []
         
-        self._dfs_paths(source, target, visited_nodes, current_path, paths, max_depth, depth=0)
+        self._dfs_paths(source, target, visited_nodes, current_path, paths)
         
         return paths
     
@@ -27,14 +27,10 @@ class PathFinder:
                    target: Node, 
                    visited_nodes: Set[str], 
                    current_path: List[Edge], 
-                   all_paths: List[List[Edge]], 
-                   max_depth: int,
-                   depth: int):
+                   all_paths: List[List[Edge]]):
         """
         Рекурсивный поиск путей с помощью DFS.
         """
-        if depth > max_depth:
-            return
         
         if current_node == target:
             if current_path:
@@ -49,7 +45,7 @@ class PathFinder:
             if next_node.name not in visited_nodes:
                 current_path.append(edge)
                 self._dfs_paths(next_node, target, visited_nodes, current_path, 
-                               all_paths, max_depth, depth + 1)
+                               all_paths)
                 current_path.pop()
         
         visited_nodes.remove(current_node.name)

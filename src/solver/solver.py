@@ -71,17 +71,15 @@ class Solver:
                 continue
             flow = self.compute_edge_total_flow(edge)
             if flow > edge.capacity:
-                excess_ratio = (flow - edge.capacity) / edge.capacity
+                excess_ratio = flow - edge.capacity
                 loss_capacity += excess_ratio ** 2
         
         # Штраф за недопоставку энергии
         for inst in self.instances:
             total_flow = inst.get_total_flow()
             if inst.target_amount > 0:
-                shortage_ratio = (inst.target_amount - total_flow) / inst.target_amount
-                # Штрафуем только положительную нехватку (отрицательная означает перебор, но мы ограничим)
-                if shortage_ratio > 0:
-                    loss_demand += shortage_ratio ** 2
+                shortage_ratio = total_flow - inst.target_amount
+                loss_demand += shortage_ratio ** 2
         
         total_loss = loss_capacity + loss_demand
         components = {
@@ -111,8 +109,8 @@ class Solver:
             if flow <= edge.capacity:
                 continue  # градиент = 0, если не превышена
             
-            # Производная: d/dx_i [ ((flow - cap)/cap)^2 ] = 2 * (flow - cap) / cap^2
-            grad_factor = 2.0 * (flow - edge.capacity) / (edge.capacity ** 2)
+            # Производная: d/dx_i [ (flow - cap)^2 ] = 2 * (flow - cap)
+            grad_factor = 2.0 * (flow - edge.capacity)
             
             if edge in self._edge_to_flows:
                 for inst_idx, path_key in self._edge_to_flows[edge]:
@@ -123,12 +121,10 @@ class Solver:
             total_flow = inst.get_total_flow()
             if inst.target_amount <= 0:
                 continue
-            shortage = inst.target_amount - total_flow
-            if shortage <= 0:
-                continue  # градиент = 0, если доставлено >= целевого
+            shortage = total_flow - inst.target_amount
             
-            # Производная: d/dx_i [ ((target - sum)/target)^2 ] = -2 * (target - sum) / target^2
-            grad_factor = -2.0 * shortage / (inst.target_amount ** 2)
+            # Производная: d/dx_i [ (sum - target)^2 ] = 2 * (sum - target)
+            grad_factor = 2.0 * shortage
             
             for path in inst.get_paths():
                 path_key = inst._path_to_key(path)
