@@ -29,7 +29,7 @@ class RequestRegistry:
         
         return len(self.requests)
     
-    def build_all_paths(self, max_depth: int = 50) -> None:
+    def build_all_paths(self) -> None:
         """
         Строит все возможные простые пути для каждой заявки.
         """
@@ -38,8 +38,7 @@ class RequestRegistry:
         for request in self.requests:
             paths = self.path_finder.find_all_simple_paths(
                 request.source, 
-                request.consumer, 
-                max_depth=max_depth
+                request.consumer
             )
             request.paths = paths
             total_paths += len(paths)
