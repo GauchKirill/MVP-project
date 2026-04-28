@@ -1,7 +1,7 @@
 """Модуль машинного обучения для оптимизации потокораспределения."""
 
 from .feature_extractor import FeatureExtractor
-from .data_generator import DataGenerator, PhysicsValidator
+from .data_generator import DataGenerator, DataVisualizer
 from .model import PathWeightNetwork
 from .loss import PowerFlowLoss, EdgeFlowCalculator
 from .training import ModelTrainer
@@ -10,7 +10,7 @@ from .inference import FlowPredictor
 __all__ = [
     'FeatureExtractor',
     'DataGenerator',
-    'PhysicsValidator',
+    'DataVisualizer',
     'PathWeightNetwork',
     'PowerFlowLoss',
     'EdgeFlowCalculator',

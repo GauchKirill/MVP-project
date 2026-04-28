@@ -2,192 +2,267 @@
 
 import numpy as np
 from typing import Dict, List, Tuple, Optional
-from copy import deepcopy
 from scipy.stats import qmc
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+
 
 class DataGenerator:
     """
-    Генератор обучающих данных с использованием Latin Hypercube Sampling
-    и вариаций реальных данных.
+    Генератор обучающих данных с использованием Latin Hypercube Sampling.
+    
+    Генерирует точки в единичном гиперкубе [0, 1]^(E + S*C).
+    Часть capacity-признаков заменяется на inf согласно уровню разреженности.
+    Нормализация выполняется позже через FeatureExtractor.normalize_features().
     """
     
     def __init__(self, 
-        base_flows: Dict[str, Dict[str, float]],
-        feature_dim: int,
-        sources: List[str],
-        consumers: List[str]):
-        self.base_flows = base_flows
+                 feature_dim: int,
+                 sources: List[str],
+                 consumers: List[str],
+                 E: int):
         self.feature_dim = feature_dim
         self.sources = sources
         self.consumers = consumers
+        self.E = E
         
-        # Собираем список всех возможных пар (source, consumer)
-        self.all_pairs = []
-        for s in sources:
-            for c in consumers:
-                self.all_pairs.append((s, c))
+        self.all_pairs = [(s, c) for s in sources for c in consumers]
     
-    def generate_lhs_samples(self, 
-                            num_samples: int, 
-                            sparsity: float = 0.7) -> List[Dict]:
+    def generate_samples(self, 
+                     num_samples: int,
+                     sparsity_levels: List[float] = [0.3, 0.7]) -> Tuple[np.ndarray, np.ndarray, List[Dict]]:
         """
-        Генерирует сценарии методом Latin Hypercube Sampling.
+        Генерирует сценарии.
         
         Args:
-            num_samples: количество сценариев
-            sparsity: доля нулевых заявок (разреженность)
+            num_samples: количество сэмплов на каждый уровень разреженности
+            sparsity_levels: список долей рёбер, которые станут inf (0.3 = 30% inf)
             
         Returns:
-            список словарей с заявками
+            raw_features: (total_samples, feature_dim) — значения в [0, 1] + inf
+            demands_matrix: (total_samples, S, C) — заявки в [0, 1]
+            scenarios: список словарей заявок (для отладки)
         """
-        # Используем LHS для равномерного покрытия гиперкуба
-        sampler = qmc.LatinHypercube(d=self.feature_dim)
-        samples = sampler.random(n=num_samples)
+        all_features = []
+        all_scenarios = []
         
-        scenarios = []
-        for sample in samples:
-            flows = self._sample_to_flows(sample, sparsity)
-            scenarios.append(flows)
+        S = len(self.sources)
+        C = len(self.consumers)
         
-        return scenarios
+        for sparsity in sparsity_levels:
+            print(f"\nГенерация для sparsity={sparsity:.2f} (доля inf capacity: {sparsity*100:.0f}%)")
+            
+            sampler = qmc.LatinHypercube(d=self.feature_dim)
+            samples = sampler.random(n=num_samples)
+            
+            for i in range(num_samples):
+                row = samples[i].copy()
+                
+                # Заменяем часть capacity на inf согласно уровню разреженности
+                num_inf = int(self.E * sparsity)
+                if num_inf > 0:
+                    inf_indices = np.random.choice(self.E, size=num_inf, replace=False)
+                    row[inf_indices] = float('inf')
+                
+                all_features.append(row)
+                all_scenarios.append(self._row_to_flows(row))
+        
+        all_features = np.array(all_features, dtype=np.float32)
+        
+        # Формируем demands_matrix из тех же данных
+        demands_matrix = np.zeros((len(all_features), S, C), dtype=np.float32)
+        for i, row in enumerate(all_features):
+            offset = self.E
+            for idx, (s_name, c_name) in enumerate(self.all_pairs):
+                s_idx = self.sources.index(s_name)
+                c_idx = self.consumers.index(c_name)
+                val = row[offset + idx]
+                demands_matrix[i, s_idx, c_idx] = val
+        
+        print(f"\n✓ Сгенерировано {len(all_scenarios)} сценариев")
+        print(f"  - Размер матрицы признаков: {all_features.shape}")
+        print(f"  - Диапазон demands: [{demands_matrix.min():.4f}, {demands_matrix.max():.4f}]")
+        
+        return all_features, demands_matrix, all_scenarios
     
-    def generate_varied_samples(self, 
-                                num_samples: int, 
-                                noise_std: float = 0.3) -> List[Dict]:
-        """
-        Генерирует сценарии путём добавления шума к реальным данным.
-        
-        Args:
-            num_samples: количество сценариев
-            noise_std: стандартное отклонение шума (в долях от значения)
-            
-        Returns:
-            список словарей с заявками
-        """
-        scenarios = []
-        
-        for _ in range(num_samples):
-            flows = deepcopy(self.base_flows)
-            
-            for source in flows:
-                for consumer in flows[source]:
-                    base_value = flows[source][consumer]
-                    # Логнормальный шум (чтобы не уходить в отрицательные значения)
-                    noise = np.random.lognormal(mean=0, sigma=noise_std)
-                    new_value = base_value * noise
-                    
-                    # Ограничиваем снизу
-                    flows[source][consumer] = max(0.01 * base_value, new_value)
-            
-            scenarios.append(flows)
-        
-        return scenarios
-    
-    def generate_mixed_samples(self, 
-                            total_samples: int,
-                            lhs_ratio: float = 0.3,
-                            sparsity: float = 0.7,
-                            noise_std: float = 0.3) -> List[Dict]:
-        """
-        Генерирует смешанную выборку: LHS + вариации реальных данных.
-        
-        Args:
-            total_samples: общее количество сценариев
-            lhs_ratio: доля LHS сэмплов
-            sparsity: разреженность для LHS
-            noise_std: уровень шума для вариаций
-            
-        Returns:
-            список словарей с заявками
-        """
-        num_lhs = int(total_samples * lhs_ratio)
-        num_varied = total_samples - num_lhs
-        
-        scenarios = []
-        
-        if num_lhs > 0:
-            lhs_scenarios = self.generate_lhs_samples(num_lhs, sparsity)
-            scenarios.extend(lhs_scenarios)
-        
-        if num_varied > 0:
-            varied_scenarios = self.generate_varied_samples(num_varied, noise_std)
-            scenarios.extend(varied_scenarios)
-        
-        # Перемешиваем
-        np.random.shuffle(scenarios)
-        
-        return scenarios
-    
-    def _sample_to_flows(self, sample: np.ndarray, sparsity: float) -> Dict:
-        """
-        Преобразует точку из гиперкуба в словарь заявок.
-        
-        Args:
-            sample: вектор размера feature_dim в диапазоне [0, 1]
-            sparsity: доля нулевых заявок
-            
-        Returns:
-            словарь с заявками
-        """
+    def _row_to_flows(self, row: np.ndarray) -> Dict:
+        """Преобразует строку признаков в словарь заявок (для отладки)."""
         flows = {s: {} for s in self.sources}
-        
-        # Определяем, сколько признаков соответствует заявкам
-        # (предполагаем, что первые E признаков — capacity рёбер,
-        #  остальные — заявки S*C)
-        demand_features = sample[-len(self.all_pairs):]
-        
-        # Применяем разреженность
-        mask = np.random.random(len(demand_features)) > sparsity
-        demand_features = demand_features * mask
-        
-        # Масштабируем заявки (умножаем на типичную величину)
-        typical_demand = self._get_typical_demand()
-        demand_features = demand_features * typical_demand * 2
-        
-        # Распределяем по парам
+        offset = self.E
         for idx, (s_name, c_name) in enumerate(self.all_pairs):
-            if idx < len(demand_features) and demand_features[idx] > 0:
-                flows[s_name][c_name] = float(demand_features[idx])
-        
+            val = row[offset + idx]
+            if val > 0:
+                flows[s_name][c_name] = float(val)
         return flows
-    
-    def _get_typical_demand(self) -> float:
-        """Возвращает типичную величину заявки (медиану по всем ненулевым)."""
-        all_demands = []
-        for consumers in self.base_flows.values():
-            all_demands.extend(consumers.values())
-        
-        if all_demands:
-            return float(np.median(all_demands))
-        return 100.0  # fallback
 
 
-class PhysicsValidator:
+class DataVisualizer:
     """
-    Проверяет физическую реализуемость сгенерированных сценариев.
+    Визуализация сгенерированных данных с помощью PCA.
     """
     
-    def __init__(self, graph, feature_extractor):
-        self.graph = graph
-        self.extractor = feature_extractor
+    def __init__(self, save_dir: str = 'genereted'):
+        self.save_dir = save_dir
+        import os
+        os.makedirs(save_dir, exist_ok=True)
     
-    def is_feasible(self, flows: Dict) -> bool:
+    def visualize_pca(self, 
+                      features: np.ndarray,
+                      labels: Optional[np.ndarray] = None,
+                      save_name: str = 'pca_visualization.png',
+                      show: bool = True) -> None:
         """
-        Проверяет, не нарушает ли сценарий базовые физические ограничения.
-        
-        Критерии:
-        1. Сумма заявок от одного источника не превышает разумного предела
-        2. Нет отрицательных заявок
+        Визуализирует данные в проекции на первые 3 главные компоненты PCA.
+        inf заменяются на 0 для визуализации.
         """
-        # Проверка на отрицательные значения
-        for source, consumers in flows.items():
-            for demand in consumers.values():
-                if demand < 0:
-                    return False
+        features_clean = np.where(np.isfinite(features), features, 0.0)
         
-        # Можно добавить дополнительные проверки
-        return True
+        scaler = StandardScaler()
+        features_scaled = scaler.fit_transform(features_clean)
+        
+        pca = PCA(n_components=min(3, features.shape[1]))
+        features_pca = pca.fit_transform(features_scaled)
+        
+        fig = plt.figure(figsize=(14, 10))
+        
+        # 3D проекция
+        ax1 = fig.add_subplot(2, 2, 1, projection='3d')
+        xs = features_pca[:, 0].tolist()
+        ys = features_pca[:, 1].tolist() if features_pca.shape[1] > 1 else np.zeros(len(xs)).tolist()
+        zs = features_pca[:, 2].tolist() if features_pca.shape[1] > 2 else np.zeros(len(xs)).tolist()
+        
+        if labels is not None:
+            unique_labels = np.unique(labels)
+            for label in unique_labels:
+                mask = labels == label
+                ax1.plot(
+                    np.array(xs)[mask], np.array(ys)[mask], np.array(zs)[mask],
+                    'o', markersize=4, alpha=0.6, label=f'Класс {label}'
+                )
+            ax1.legend()
+        else:
+            ax1.plot(xs, ys, zs, 'o', markersize=4, alpha=0.6, color='blue')
+        
+        ax1.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)')
+        ax1.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)' if features_pca.shape[1] > 1 else '')
+        ax1.set_zlabel(f'PC3 ({pca.explained_variance_ratio_[2]*100:.1f}%)' if features_pca.shape[1] > 2 else '')
+        ax1.set_title('3D PCA проекция')
+        
+        # 2D проекция
+        ax2 = fig.add_subplot(2, 2, 2)
+        if labels is not None:
+            unique_labels = np.unique(labels)
+            for label in unique_labels:
+                mask = labels == label
+                ax2.plot(features_pca[mask, 0], 
+                        features_pca[mask, 1] if features_pca.shape[1] > 1 else np.zeros(mask.sum()),
+                        'o', markersize=4, alpha=0.6, label=f'Класс {label}')
+            ax2.legend()
+        else:
+            ax2.plot(features_pca[:, 0], 
+                    features_pca[:, 1] if features_pca.shape[1] > 1 else np.zeros(len(features_pca)),
+                    'o', markersize=4, alpha=0.6, color='blue')
+        ax2.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)')
+        ax2.set_ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)' if features_pca.shape[1] > 1 else '')
+        ax2.set_title('PC1 vs PC2')
+        ax2.grid(True, alpha=0.3)
+        
+        if features_pca.shape[1] > 2:
+            ax3 = fig.add_subplot(2, 2, 3)
+            if labels is not None:
+                unique_labels = np.unique(labels)
+                for label in unique_labels:
+                    mask = labels == label
+                    ax3.plot(features_pca[mask, 0], features_pca[mask, 2],
+                            'o', markersize=4, alpha=0.6, label=f'Класс {label}')
+                ax3.legend()
+            else:
+                ax3.plot(features_pca[:, 0], features_pca[:, 2],
+                        'o', markersize=4, alpha=0.6, color='blue')
+            ax3.set_xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)')
+            ax3.set_ylabel(f'PC3 ({pca.explained_variance_ratio_[2]*100:.1f}%)')
+            ax3.set_title('PC1 vs PC3')
+            ax3.grid(True, alpha=0.3)
+        
+        # Объяснённая дисперсия
+        ax4 = fig.add_subplot(2, 2, 4)
+        cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+        ax4.plot(range(1, len(cumulative_variance) + 1), cumulative_variance, 'b-o', markersize=4)
+        ax4.axhline(y=0.9, color='r', linestyle='--', label='90% дисперсии')
+        ax4.axhline(y=0.95, color='orange', linestyle='--', label='95% дисперсии')
+        ax4.set_xlabel('Количество компонент')
+        ax4.set_ylabel('Накопленная объяснённая дисперсия')
+        ax4.set_title('Объяснённая дисперсия PCA')
+        ax4.grid(True, alpha=0.3)
+        ax4.legend()
+        
+        plt.tight_layout()
+        
+        import os
+        save_path = os.path.join(self.save_dir, save_name)
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        
+        print(f"✓ PCA визуализация сохранена в {save_path}")
+        print(f"  - PC1 объясняет {pca.explained_variance_ratio_[0]*100:.1f}% дисперсии")
     
-    def filter_feasible(self, scenarios: List[Dict]) -> List[Dict]:
-        """Оставляет только физически реализуемые сценарии."""
-        return [s for s in scenarios if self.is_feasible(s)]
+    def visualize_distribution(self,
+                               features: np.ndarray,
+                               save_name: str = 'distribution.png',
+                               show: bool = True) -> None:
+        """
+        Визуализирует распределение значений признаков.
+        """
+        fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+        
+        # Распределение средних значений признаков (только конечных)
+        ax = axes[0]
+        finite_features = np.where(np.isfinite(features), features, np.nan)
+        feature_means = np.nanmean(finite_features, axis=0)
+        feature_means = feature_means[np.isfinite(feature_means)]
+        
+        ax.hist(feature_means, bins=50, edgecolor='black', alpha=0.7)
+        ax.set_xlabel('Среднее значение признака')
+        ax.set_ylabel('Количество признаков')
+        ax.set_title('Распределение средних значений признаков (без inf)')
+        ax.axvline(x=np.mean(feature_means), color='r', linestyle='--',
+                  label=f'Среднее: {np.mean(feature_means):.4e}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Распределение всех конечных значений
+        ax = axes[1]
+        all_finite = features[np.isfinite(features)]
+        ax.hist(all_finite, bins=100, edgecolor='black', alpha=0.7, density=True)
+        ax.set_xlabel('Значение признака')
+        ax.set_ylabel('Плотность')
+        ax.set_title('Распределение конечных значений признаков')
+        
+        stats_text = (f"Статистика:\n"
+                     f"Мин: {all_finite.min():.4e}\n"
+                     f"Макс: {all_finite.max():.4e}\n"
+                     f"Медиана: {np.median(all_finite):.4e}\n"
+                     f"Доля inf: {(~np.isfinite(features)).mean():.2%}")
+        
+        ax.text(0.95, 0.95, stats_text, transform=ax.transAxes,
+               verticalalignment='top', horizontalalignment='right',
+               bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8),
+               fontsize=9)
+        
+        plt.tight_layout()
+        
+        import os
+        save_path = os.path.join(self.save_dir, save_name)
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
+        
+        if show:
+            plt.show()
+        else:
+            plt.close()
+        
+        print(f"✓ Распределение признаков сохранено в {save_path}")

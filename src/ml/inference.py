@@ -28,42 +28,59 @@ class FlowPredictor:
         
         self.model.eval()
     
-    def predict(self, flows: Dict[str, Dict[str, float]]) -> Dict:
+    def predict_with_normalized(self, 
+                                normalized_features: np.ndarray,
+                                flows: Dict[str, Dict[str, float]],
+                                capacity_mask: np.ndarray) -> Dict:
         """
-        Предсказывает распределение потоков для заданных заявок.
-        """
-        # Извлекаем признаки
-        features = self.feature_extractor.extract_features(flows, normalize=True)
-        # Исправлено: создаем массив правильно
-        features_tensor = torch.FloatTensor(features).unsqueeze(0).to(self.device)
+        Предсказывает распределение потоков, используя уже нормализованные признаки.
         
-        # Создаём матрицу заявок
+        Args:
+            normalized_features: (feature_dim,) — нормализованный вектор признаков
+            flows: словарь заявок {source: {consumer: demand}} — в кВт
+            capacity_mask: (E,) — 1.0 для конечных capacity, 0.0 для inf
+            
+        Returns:
+            словарь с результатами:
+                - path_weights: (S, C, max_paths) — веса распределения
+                - path_flows: (S, C, max_paths) — потоки по путям
+                - edge_flows: (E,) — суммарные потоки на рёбрах
+                - edge_utilization: (E,) — загрузка рёбер (0..1)
+                - total_delivered: суммарная доставка
+                - demanded: суммарная заявка
+        """
+        features_tensor = torch.from_numpy(normalized_features).unsqueeze(0).float().to(self.device)
         demands = self._create_demand_matrix(flows)
-        demands_tensor = torch.FloatTensor(demands).unsqueeze(0).to(self.device)
+        demands_tensor = torch.from_numpy(demands).unsqueeze(0).float().to(self.device)
         
-        # Предсказание
         with torch.no_grad():
+            # Прямой проход
             path_weights = self.model(features_tensor)[0]  # (S, C, max_paths)
-            path_flows = path_weights * demands_tensor[0].unsqueeze(-1)
-            edge_flows = self.edge_calculator.compute_edge_flows(path_flows.unsqueeze(0))[0]
+            path_flows = path_weights * demands_tensor[0].unsqueeze(-1)  # веса * заявки
+            edge_flows = self.edge_calculator.compute_edge_flows(path_flows.unsqueeze(0))[0]  # (E,)
         
-        # Конвертируем в numpy
+        # В numpy
         path_weights_np = path_weights.cpu().numpy()
         path_flows_np = path_flows.cpu().numpy()
         edge_flows_np = edge_flows.cpu().numpy()
         
-        # Вычисляем загрузку рёбер
+        # Загрузка рёбер — только для конечных capacity
         edge_capacities = self.feature_extractor.get_edge_capacities()
-        edge_utilization = np.divide(
-            edge_flows_np,
-            edge_capacities,
-            out=np.zeros_like(edge_flows_np),
-            where=edge_capacities < 1e8
-        )
+        edge_utilization = np.zeros_like(edge_flows_np)
+        finite_mask = capacity_mask > 0.5
+        if finite_mask.any():
+            # Применяем маску: для inf-рёбер загрузка = 0
+            edge_utilization[finite_mask] = np.divide(
+                edge_flows_np[finite_mask],
+                edge_capacities[finite_mask],
+                out=np.zeros_like(edge_flows_np[finite_mask]),
+                where=edge_capacities[finite_mask] < 1e8  # на всякий случай
+            )
         
         # Суммарная доставка
         demands_np = demands.flatten()
         delivered_np = path_flows_np.sum(axis=-1).flatten()
+        # Доставка не может превышать заявку (веса в сумме <= 1 после softmax)
         total_delivered = min(demands_np.sum(), delivered_np.sum())
         
         return {
@@ -76,7 +93,9 @@ class FlowPredictor:
         }
     
     def _create_demand_matrix(self, flows: Dict) -> np.ndarray:
-        """Создаёт матрицу заявок (S, C)."""
+        """
+        Создаёт матрицу заявок (S, C) из словаря {source: {consumer: demand}}.
+        """
         S = self.feature_extractor.S
         C = self.feature_extractor.C
         demands = np.zeros((S, C), dtype=np.float32)
@@ -94,10 +113,15 @@ class FlowPredictor:
         return demands
     
     def predict_batch(self, flows_list: List[Dict]) -> List[Dict]:
-        """Предсказывает для батча сценариев."""
+        """
+        Предсказывает для батча сценариев.
+        Каждый сценарий нормализуется индивидуально.
+        """
         results = []
         for flows in flows_list:
-            results.append(self.predict(flows))
+            raw = self.feature_extractor.build_raw_features(flows)
+            norm_features, cap_mask = self.feature_extractor.normalize_features(raw)
+            results.append(self.predict_with_normalized(norm_features, flows, cap_mask))
         return results
     
     def save_results(self, results: Dict, filename: str):

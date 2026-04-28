@@ -2,10 +2,11 @@ import torch
 import json
 from graph import Graph, GraphView, RequestRegistry
 from ml import (
-        FeatureExtractor, DataGenerator, PhysicsValidator,
-        PathWeightNetwork, PowerFlowLoss, EdgeFlowCalculator,
-        ModelTrainer, FlowPredictor
-    )
+    FeatureExtractor, DataGenerator,
+    PathWeightNetwork, PowerFlowLoss, EdgeFlowCalculator,
+    ModelTrainer, FlowPredictor
+)
+from ml.data_generator import DataVisualizer
 
 from ml.visualization import TrainingVisualizer, FlowVisualizer
 import numpy as np
@@ -17,20 +18,19 @@ GRAPH_FILE: str = 'graph.html'
 
 # === НАСТРАИВАЕМЫЕ ПАРАМЕТРЫ ===
 TRAINING_CONFIG = {
-    'num_samples': 2000,        # количество сценариев для обучения (уменьшено для скорости)
-    'batch_size': 32,           # размер батча
-    'epochs': 50,               # максимальное количество эпох
-    'learning_rate': 3e-4,      # скорость обучения
-    'early_stopping_patience': 15,  # терпение для ранней остановки
-    'lhs_ratio': 0.3,           # доля LHS сэмплов
-    'noise_std': 0.3,           # стандартное отклонение шума для вариаций
+    'num_samples_per_level': 1000,  # сэмплов на каждый уровень разреженности
+    'sparsity_levels': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],  # уровни разреженности
+    'batch_size': 128,
+    'epochs': 200,
+    'learning_rate': 1e-4,
+    'early_stopping_patience': 10,
 }
 
 # === ФЛАГИ ===
 VISUALIZE_TRAINING = True       # строить ли графики обучения
 VISUALIZE_FLOWS = True          # создавать ли HTML визуализацию
-RUN_SENSITIVITY = True          # запускать ли анализ чувствительности
 SAVE_REPORT = True              # сохранять ли JSON отчёт
+VISUALIZE_DATA = True           # визуализировать ли сгенерированные данные
 
 def load_edges(graph, filename):
     """Загружает рёбра графа из JSON-файла."""
@@ -122,7 +122,9 @@ def train_model(graph, registry, config=None):
     print("ОБУЧЕНИЕ НЕЙРОСЕТЕВОЙ МОДЕЛИ")
     print("=" * 60)
     print(f"Конфигурация:")
-    print(f"  - Обучающих сценариев: {config['num_samples']}")
+    print(f"  - Сэмплов на уровень: {config['num_samples_per_level']}")
+    print(f"  - Уровни разреженности: {config['sparsity_levels']}")
+    print(f"  - Всего уровней: {len(config['sparsity_levels'])}")
     print(f"  - Батчей: {config['batch_size']}")
     print(f"  - Эпох (макс): {config['epochs']}")
     print(f"  - Learning rate: {config['learning_rate']}")
@@ -133,6 +135,7 @@ def train_model(graph, registry, config=None):
     
     # Создаём экстрактор признаков
     extractor = FeatureExtractor(graph, registry)
+    path_mask = extractor.create_path_mask()
     print(f"✓ Размерность признаков: {extractor.feature_dim}")
     print(f"✓ Форма выхода: {extractor.get_output_shape()}")
     print(f"✓ Максимальное число путей: {extractor.max_paths}")
@@ -143,28 +146,28 @@ def train_model(graph, registry, config=None):
     # Генерируем обучающие данные
     print("\nГенерация обучающих данных...")
     generator = DataGenerator(
-        base_flows=base_flows,
         feature_dim=extractor.feature_dim,
         sources=[s.name for s in extractor.sources],
-        consumers=[c.name for c in extractor.consumers]
+        consumers=[c.name for c in extractor.consumers],
+        E=extractor.E
     )
-    
-    scenarios = generator.generate_mixed_samples(
-        total_samples=config['num_samples'],
-        lhs_ratio=config['lhs_ratio'],
-        sparsity=0.7,
-        noise_std=config['noise_std']
+
+    # Получаем сырые признаки (с inf) и сценарии
+    raw_features, demands_matrix, scenarios = generator.generate_samples(
+        num_samples=config['num_samples_per_level'],
+        sparsity_levels=config['sparsity_levels']
     )
-    
-    # Фильтруем физически реализуемые сценарии
-    validator = PhysicsValidator(graph, extractor)
-    scenarios = validator.filter_feasible(scenarios)
-    print(f"✓ Сгенерировано {len(scenarios)} реализуемых сценариев")
-    
-    # Извлекаем признаки и заявки
-    train_features = extractor.extract_batch_features(scenarios)
-    
-    # Создаём матрицы заявок
+
+    # Нормализуем и получаем маски
+    train_features, capacity_masks = extractor.normalize_features(raw_features)
+
+    print(f"✓ Сгенерировано {len(scenarios)} сценариев")
+    print(f"✓ Размер матрицы признаков: {train_features.shape}")
+    print(f"  - Мин значение: {train_features.min():.6e}")
+    print(f"  - Макс значение: {train_features.max():.4f}")
+    print(f"  - Среднее: {train_features.mean():.6e}")
+
+    # Создаём матрицы заявок ИЗ СЦЕНАРИЕВ (не из features!)
     S, C = extractor.S, extractor.C
     train_demands = np.zeros((len(scenarios), S, C), dtype=np.float32)
     for i, flows in enumerate(scenarios):
@@ -175,14 +178,16 @@ def train_model(graph, registry, config=None):
                     if c_name in extractor.consumer_to_idx:
                         c_idx = extractor.consumer_to_idx[c_name]
                         train_demands[i, s_idx, c_idx] = demand
-    
+
     # Разделяем на train/val
-    split_idx = int(0.8 * len(scenarios))
-    val_features = train_features[split_idx:] if split_idx < len(train_features) else train_features
-    val_demands = train_demands[split_idx:] if split_idx < len(train_demands) else train_demands
+    split_idx = int(0.8 * len(train_features))
+    val_features = train_features[split_idx:]
+    val_demands = demands_matrix[split_idx:]
+    val_masks = capacity_masks[split_idx:]
     train_features = train_features[:split_idx]
-    train_demands = train_demands[:split_idx]
-    
+    train_demands = demands_matrix[:split_idx]
+    train_masks = capacity_masks[:split_idx]
+
     print(f"✓ Train: {len(train_features)}, Val: {len(val_features)}")
     
     # Создаём модель
@@ -199,11 +204,9 @@ def train_model(graph, registry, config=None):
     
     # Создаём вычислитель потоков на рёбрах и функцию потерь
     edge_calculator = EdgeFlowCalculator(registry, extractor)
-    # В train_model() при создании loss_fn:
-    # Теперь веса имеют смысл относительной важности
     loss_fn = PowerFlowLoss(
-        capacity_weight=1.0,
-        demand_weight=1e-6
+        capacity_weight=10.0,
+        demand_weight=1.0
     )
     
     # Обучаем модель
@@ -217,8 +220,10 @@ def train_model(graph, registry, config=None):
     history = trainer.train(
         train_features=train_features,
         train_demands=train_demands,
+        train_capacity_masks=train_masks,
         val_features=val_features,
         val_demands=val_demands,
+        val_capacity_masks=val_masks,
         epochs=config['epochs'],
         batch_size=config['batch_size'],
         early_stopping_patience=config['early_stopping_patience'],
@@ -245,10 +250,13 @@ def train_model(graph, registry, config=None):
     print("\n" + "=" * 60)
     print("ТЕСТИРОВАНИЕ НА РЕАЛЬНЫХ ДАННЫХ")
     print("=" * 60)
-    
+
+    # Тестирование на реальных данных
     predictor = FlowPredictor(model, extractor, edge_calculator, device)
-    results = predictor.predict(base_flows)
-    
+    raw_real = extractor.build_raw_features(base_flows)
+    real_features, real_mask = extractor.normalize_features(raw_real)
+    results = predictor.predict_with_normalized(real_features, base_flows, real_mask)
+
     print(f"Заявлено: {results['demanded']:.1f} кВт")
     print(f"Доставлено: {results['total_delivered']:.1f} кВт")
     if results['demanded'] > 0:
@@ -270,7 +278,7 @@ def train_model(graph, registry, config=None):
             util = edge_utils[idx] * 100
             cap = extractor.get_edge_capacities()[idx]
             flow = results['edge_flows'][idx]
-            if cap >= 1e8:
+            if ~np.isfinite(cap):
                 print(f"  - {edge.nodes[0].name} ↔ {edge.nodes[1].name}: "
                     f"{flow:.1f} / ∞ кВт ({util:.1f}%)")
             else:
@@ -291,44 +299,6 @@ def train_model(graph, registry, config=None):
         # Сохраняем отчёт
         if SAVE_REPORT:
             flow_viz.save_results_report(results, base_flows, 'results_base.json')
-    
-    # Анализ чувствительности
-    if RUN_SENSITIVITY:
-        print("\n" + "=" * 60)
-        print("АНАЛИЗ ЧУВСТВИТЕЛЬНОСТИ")
-        print("=" * 60)
-        
-        flow_viz = FlowVisualizer(graph, extractor, registry, save_dir=GENERETED_FOLDER)
-        sensitivity_results = flow_viz.plot_sensitivity_analysis(
-            predictor,
-            base_flows,
-            parameter='demand',
-            variation_range=(0.5, 2.0),
-            num_points=15,
-            save_name='sensitivity_demand.png',
-            show=False
-        )
-        
-        # Выводим ключевые точки
-        print("\nКлючевые точки:")
-        mults = sensitivity_results['multipliers']
-        deliveries = sensitivity_results['delivery_ratios']
-        overloads = sensitivity_results['overload_counts']
-        
-        # Находим точку, где начинаются перегрузки
-        for i, (mult, ov) in enumerate(zip(mults, overloads)):
-            if ov > 0:
-                print(f"  - Перегрузки начинаются при множителе {mult:.2f}")
-                print(f"    (заявки увеличены на {(mult-1)*100:.0f}%)")
-                break
-        
-        # Находим точку, где доставка падает ниже 95%
-        for i, (mult, deliv) in enumerate(zip(mults, deliveries)):
-            if deliv < 95:
-                print(f"  - Доставка падает ниже 95% при множителе {mult:.2f}")
-                break
-    
-    print("\n✓ Обучение и тестирование завершены!")
     
     return predictor, results
 

@@ -5,7 +5,6 @@ from typing import Dict, List, Tuple, Optional
 import sys
 import os
 
-# Добавляем родительскую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from graph import Graph, RequestRegistry, Request
@@ -20,7 +19,14 @@ class FeatureExtractor:
     - S: количество источников
     - C: количество потребителей
     
-    Признаки нормализуются делением на сумму всех значений.
+    Признаки:
+    - первые E элементов: capacity рёбер (float('inf') для неограниченных)
+    - остальные S*C: demands от источника к потребителю
+    
+    Нормализация через normalize_features():
+    1. Глобальный максимум по всем конечным элементам
+    2. Конечные значения делятся на этот максимум, inf остаются inf
+    3. inf заменяются на 1.0
     """
     
     def __init__(self, graph: Graph, registry: RequestRegistry):
@@ -42,7 +48,7 @@ class FeatureExtractor:
         self.C = len(self.consumers)
         self.feature_dim = self.E + self.S * self.C
         
-        # Максимальное число путей (определяется эмпирически)
+        # Максимальное число путей
         self.max_paths = self._find_max_paths()
         
     def _find_max_paths(self) -> int:
@@ -53,26 +59,23 @@ class FeatureExtractor:
                 max_paths = max(max_paths, len(request.paths))
         return max_paths
     
-    def extract_features(self, 
-                         flows: Dict[str, Dict[str, float]], 
-                         normalize: bool = True) -> np.ndarray:
+    def build_raw_features(self, flows: Dict[str, Dict[str, float]]) -> np.ndarray:
         """
-        Извлекает вектор признаков из данных о потоках.
+        Строит сырой вектор признаков (без нормализации) из словаря заявок.
         
         Args:
             flows: словарь вида {source: {consumer: demand}}
-            normalize: нормализовать ли признаки делением на сумму
             
         Returns:
-            numpy массив размера (feature_dim,)
+            numpy массив размера (feature_dim,) с сырыми значениями
         """
         features = np.zeros(self.feature_dim, dtype=np.float32)
         
-        # 1. Заполняем capacity рёбер (первые E признаков)
+        # 1. Capacity рёбер
         for i, edge in enumerate(self.edges):
-            features[i] = edge.capacity
+            features[i] = edge.capacity  # float('inf') для неограниченных
         
-        # 2. Заполняем заявки (оставшиеся S*C признаков)
+        # 2. Заявки
         offset = self.E
         for s_name, consumers in flows.items():
             if s_name not in self.source_to_idx:
@@ -82,64 +85,66 @@ class FeatureExtractor:
                 if c_name not in self.consumer_to_idx:
                     continue
                 c_idx = self.consumer_to_idx[c_name]
-                flat_idx = offset + s_idx * self.C + c_idx
-                features[flat_idx] = demand
+                features[offset + s_idx * self.C + c_idx] = demand
         
-        # 3. Нормализация - ВСЁ делим на сумму конечных значений
-        if normalize:
-            # Суммируем только конечные значения
-            total_sum = 0.0
-            for i, val in enumerate(features):
-                if np.isfinite(val):
-                    total_sum += val
-            
-            if total_sum > 0:
-                features = features / total_sum
-                # Для inf значений устанавливаем 1.0
-                features[np.isinf(features)] = 1.0
-
         return features
     
-    def extract_batch_features(self, 
-                               flows_list: List[Dict], 
-                               normalize: bool = True) -> np.ndarray:
+    def normalize_features(self, features: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Извлекает признаки для батча сценариев.
+        Нормализует признаки:
+        1. Находит глобальный максимум по всем конечным элементам (capacity + demands).
+        2. Конечные значения делятся на этот максимум, inf остаются inf.
+        3. inf заменяются на 1.0.
         
+        Args:
+            features: (feature_dim,) или (batch_size, feature_dim)
+            
         Returns:
-            numpy массив размера (batch_size, feature_dim)
+            normalized_features: той же формы
+            capacity_mask: (E,) или (batch_size, E) — 1.0 для изначально конечных capacity,
+                           0.0 для тех, что были inf
         """
-        batch_features = np.zeros((len(flows_list), self.feature_dim), dtype=np.float32)
-        for i, flows in enumerate(flows_list):
-            batch_features[i] = self.extract_features(flows, normalize=True)
+        if features.ndim == 1:
+            features = features.copy()
+            # Маска конечных capacity до замен
+            capacity_mask = np.isfinite(features[:self.E]).astype(np.float32)
+            
+            # Глобальный максимум только по конечным значениям
+            finite_vals = features[np.isfinite(features)]
+            global_max = finite_vals.max() if len(finite_vals) > 0 else 1.0
+            
+            # Деление конечных, inf остаются inf
+            features = np.where(np.isfinite(features), features / global_max, features)
+            # Замена inf → 1.0
+            features[~np.isfinite(features)] = 1.0
+            
+            return features, capacity_mask
         
-        # Нормализуем каждый сценарий отдельно
-        if normalize:
-            row_sums = batch_features.sum(axis=1, keepdims=True)
-            row_sums[row_sums == 0] = 1.0  # избегаем деления на 0
-            batch_features = batch_features / row_sums
-        
-        return batch_features
+        else:
+            batch_size = features.shape[0]
+            features = features.copy()
+            capacity_mask = np.zeros((batch_size, self.E), dtype=np.float32)
+            
+            for i in range(batch_size):
+                row = features[i]
+                cap_mask = np.isfinite(row[:self.E])
+                capacity_mask[i] = cap_mask.astype(np.float32)
+                
+                finite_vals = row[np.isfinite(row)]
+                global_max = finite_vals.max() if len(finite_vals) > 0 else 1.0
+                
+                row = np.where(np.isfinite(row), row / global_max, row)
+                row[~np.isfinite(row)] = 1.0
+                features[i] = row
+            
+            return features, capacity_mask
     
     def get_output_shape(self) -> Tuple[int, int, int]:
-        """
-        Возвращает форму выходного тензора.
-        
-        Returns:
-            (S, C, max_paths) - трёхмерная матрица весов путей
-        """
+        """Возвращает форму выходного тензора: (S, C, max_paths)."""
         return (self.S, self.C, self.max_paths)
     
     def create_path_mask(self) -> np.ndarray:
-        """
-        Создаёт маску для выходного слоя.
-        
-        Маска содержит 1 для существующих путей и 0 для несуществующих.
-        Используется для маскирования логитов перед softmax.
-        
-        Returns:
-            numpy массив размера (S, C, max_paths)
-        """
+        """Создаёт маску для выходного слоя: 1 для существующих путей, 0 для несуществующих."""
         mask = np.zeros((self.S, self.C, self.max_paths), dtype=np.float32)
         
         for request in self.registry.requests:
@@ -158,20 +163,10 @@ class FeatureExtractor:
     
     def get_edge_capacities(self) -> np.ndarray:
         """
-        Возвращает массив пропускных способностей всех рёбер.
-        Для inf оставляем np.inf (не 1e9).
+        Возвращает массив пропускных способностей рёбер.
+        Используется в loss-функции для вычисления превышений.
         """
         caps = np.zeros(self.E, dtype=np.float32)
         for i, edge in enumerate(self.edges):
-            caps[i] = edge.capacity if edge.capacity != float('inf') else np.inf
+            caps[i] = edge.capacity
         return caps
-    
-    def get_finite_mask(self) -> np.ndarray:
-        """
-        Возвращает булеву маску рёбер с конечной capacity.
-        """
-        mask = np.ones(self.E, dtype=bool)
-        for i, edge in enumerate(self.edges):
-            if edge.capacity == float('inf'):
-                mask[i] = False
-        return mask
