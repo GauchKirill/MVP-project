@@ -1,7 +1,7 @@
 import json
 from src.config_parser import ConfigParser
 from src.graph import Graph, RequestRegistry
-from src.ml.pipeline import run_training, run_prediction
+from src.ml.pipeline import run_training, run_prediction, run_solver_pipeline
 
 def load_edges(graph, filename):
     with open(filename, 'r') as f:
@@ -20,14 +20,17 @@ def main():
     load_edges(graph, f"settings/{run_cfg.edges_file}")
     registry = RequestRegistry(graph)
     registry.generate_all_requests()
-    registry.build_all_paths(max_depth=50)
+    registry.build_all_paths()
 
-    if run_cfg.mode == 'train':
+    mode = run_cfg.mode
+    if mode == 'train':
         run_training(graph, registry, run_cfg, train_cfg)
-    elif run_cfg.mode == 'predict':
+    elif mode == 'predict':
         run_prediction(graph, registry, run_cfg, train_cfg)
+    elif mode == 'solve':
+        run_solver_pipeline(graph, registry, run_cfg, train_cfg)
     else:
-        raise ValueError(f"Неизвестный режим: {run_cfg.mode}")
+        raise ValueError(f"Неизвестный режим: {mode}")
 
 if __name__ == "__main__":
     main()

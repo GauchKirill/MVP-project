@@ -250,7 +250,6 @@ class Solver:
         if not self.instances:
             return {'success': False, 'message': 'Нет экземпляров потоков'}
         
-        self.initialize_uniform()
         self.loss_history = []
         
         for iteration in range(self.max_iter):
