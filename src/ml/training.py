@@ -92,7 +92,7 @@ class ModelTrainer:
         patience_counter = 0
         best_model_state = None
         
-        for epoch in range(epochs):
+        for epoch in tqdm(range(epochs)):
             self.model.train()
             train_loss, train_components = self._run_epoch(
                 train_loader, train_capacity_masks, training=True

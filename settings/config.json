@@ -1,0 +1,29 @@
+{
+  "training": {
+    "num_samples_per_level": 300,
+    "sparsity_levels": [0.3, 0.7],
+    "batch_size": 32,
+    "epochs": 30,
+    "learning_rate": 1e-3,
+    "early_stopping_patience": 5
+  },
+  "model": {
+    "hidden_dims": [512, 256, 128],
+    "dropout_rate": 0.3
+  },
+  "loss": {
+    "capacity_weight": 10.0,
+    "demand_weight": 1.0
+  },
+  "visualization": {
+    "training": true,
+    "flows": true,
+    "save_report": true,
+    "visualize_data": true
+  },
+  "paths": {
+    "generated_folder": "genereted",
+    "model_save_name": "model.pt",
+    "graph_html": "graph.html"
+  }
+}
