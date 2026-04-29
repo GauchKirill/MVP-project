@@ -16,12 +16,15 @@
     "demand_weight": 1.0
   },
   "solver": {
-    "learning_rate": 1.5,
-    "max_iter": 300,
+    "learning_rate": 0.2,
+    "max_iter": 5000,
     "epsilon": 1e-6,
     "gradient_epsilon_rel": 0.01,
+    "capacity_weight": 3.0,
+    "excess_weight": 1.5,
     "verbose": true
   },
+
   "visualization": {
     "training": true,
     "flows": true,
