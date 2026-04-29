@@ -72,6 +72,7 @@ class ModelTrainer:
             epochs: int = 100,
             batch_size: int = 32,
             early_stopping_patience: int = 30,
+            min_delta: float = 1e-6,
             verbose: bool = True) -> Dict:
         
         train_dataset = TensorDataset(
@@ -116,7 +117,8 @@ class ModelTrainer:
             if self.scheduler is not None:
                 self.scheduler.step(val_loss)
             
-            if val_loss < best_val_loss:
+            # Улучшение считается, если val_loss уменьшился хотя бы на min_delta
+            if val_loss < best_val_loss - min_delta:
                 best_val_loss = val_loss
                 patience_counter = 0
                 best_model_state = self.model.state_dict().copy()
@@ -128,7 +130,9 @@ class ModelTrainer:
             
             if patience_counter >= early_stopping_patience:
                 if verbose:
-                    print(f"\nРанняя остановка на эпохе {epoch}")
+                    print(f"\nРанняя остановка на эпохе {epoch}: "
+                        f"val_loss не улучшался {early_stopping_patience} эпох "
+                        f"(лучший val_loss = {best_val_loss:.6e})")
                 break
         
         if best_model_state is not None:

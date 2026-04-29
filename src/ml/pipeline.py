@@ -100,7 +100,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
         val_features=vv, val_demands=vd, val_capacity_masks=vm,
         epochs=train_cfg.training.epochs,
         batch_size=train_cfg.training.batch_size,
-        early_stopping_patience=train_cfg.training.early_stopping_patience
+        early_stopping_patience=train_cfg.training.early_stopping_patience,
+        min_delta=train_cfg.get('training.min_delta', 1e-6)
     )
 
     # Сохранение модели

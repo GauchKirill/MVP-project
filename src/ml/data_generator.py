@@ -55,7 +55,7 @@ class DataGenerator:
         for sparsity in sparsity_levels:
             for scale_factor in demand_scale_factors:
                 print(f"\nГенерация для sparsity={sparsity:.2f} (доля inf capacity: {sparsity*100:.0f}%), "
-                      f"demand_scale={scale_factor:.2f}")
+                      f"demand_scale={scale_factor}")
                 
                 sampler = qmc.LatinHypercube(d=self.feature_dim)
                 samples = sampler.random(n=num_samples)
