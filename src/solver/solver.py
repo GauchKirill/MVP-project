@@ -18,6 +18,7 @@ class Solver:
                  gradient_epsilon_rel: float = 0.01,
                  capacity_weight: float = 10.0,
                  excess_weight: float = 1.0,
+                 early_stopping_patience: int = 20,
                  verbose: bool = True):
         self.graph = graph
         self.lr = learning_rate
@@ -26,6 +27,7 @@ class Solver:
         self.gradient_epsilon_rel = gradient_epsilon_rel
         self.capacity_weight = capacity_weight
         self.excess_weight = excess_weight
+        self.early_stopping_patience = early_stopping_patience
         self.verbose = verbose
 
         self.instances: List[FlowInstance] = []
@@ -315,13 +317,27 @@ class Solver:
             return {'success': False, 'message': 'Нет экземпляров потоков'}
 
         self.loss_history = []
-
+        
         loss = 0.0
         components = {'shortage': 0.0, 'excess': 0.0, 'capacity_violation': 0.0, 'total_loss': 0.0}
+
+        # Для ранней остановки: отслеживаем лучшее состояние
+        best_loss = float('inf')
+        best_state = None
+        best_iteration = 0
 
         for iteration in range(self.max_iter):
             loss, components = self.compute_loss()
             self.loss_history.append(loss)
+
+            # Сохраняем лучшее состояние
+            if loss < best_loss:
+                best_loss = loss
+                best_iteration = iteration
+                # Глубокая копия текущих потоков
+                best_state = {}
+                for inst_idx, inst in enumerate(self.instances):
+                    best_state[inst_idx] = inst.path_flows.copy()
 
             if self.verbose and iteration % 5 == 0:
                 print(f"Итерация {iteration:4d}: loss = {loss:.2f} "
@@ -329,15 +345,33 @@ class Solver:
                       f"excess={components['excess']:.2f}, "
                       f"cap_viol={components['capacity_violation']:.2f})")
 
-            if iteration > 0 and abs(self.loss_history[-1] - self.loss_history[-2]) < self.epsilon:
-                if self.verbose:
-                    print(f"Сошлось на итерации {iteration} с loss = {loss:.2f}")
-                break
+            # Проверка сходимости
+            if iteration > 0:
+                # Критерий 1: абсолютное изменение меньше epsilon
+                if abs(self.loss_history[-1] - self.loss_history[-2]) < self.epsilon:
+                    if self.verbose:
+                        print(f"Сошлось по epsilon на итерации {iteration} с loss = {loss:.2f}")
+                    break
+                
+                # Критерий 2: нет улучшения на протяжении early_stopping_patience итераций
+                if iteration >= self.early_stopping_patience:
+                    # Проверяем, когда был достигнут лучший результат
+                    if iteration - best_iteration >= self.early_stopping_patience:
+                        if self.verbose:
+                            print(f"Ранняя остановка на итерации {iteration}: "
+                                  f"нет улучшения {self.early_stopping_patience} итераций "
+                                  f"(лучший loss = {best_loss:.2f} на итерации {best_iteration})")
+                        break
 
             grads = self.compute_gradients()
             self._apply_two_stage_update(grads)
 
-        # Финальные метрики
+        # Восстанавливаем лучшее состояние
+        if best_state is not None:
+            for inst_idx, inst in enumerate(self.instances):
+                inst.path_flows = best_state[inst_idx]
+
+        # Финальные метрики — считаем на лучшем состоянии
         desired_flows = {}
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
@@ -371,11 +405,12 @@ class Solver:
 
         return {
             'success': True,
-            'final_loss': loss,
+            'final_loss': best_loss,
             'total_shortage': total_shortage,
             'total_excess': total_excess,
             'capacity_violation': capacity_violation,
             'iterations': len(self.loss_history),
+            'best_iteration': best_iteration,
             'loss_history': self.loss_history
         }
 

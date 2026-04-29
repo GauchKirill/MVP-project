@@ -215,6 +215,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         gradient_epsilon_rel=solver_cfg.gradient_epsilon_rel,
         capacity_weight=solver_cfg.capacity_weight,
         excess_weight=solver_cfg.excess_weight,
+        early_stopping_patience=solver_cfg.early_stopping_patience,
         verbose=solver_cfg.verbose
     )
     solver.set_instances(instances)
