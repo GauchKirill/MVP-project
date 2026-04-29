@@ -181,7 +181,7 @@ class Solver:
                 actual_total += actual_flows.get((inst_idx, path_key), 0.0)
             
             # Недопоставка = заявленная - фактическая
-            shortage = abs(inst.target_amount - actual_total)
+            shortage = max(inst.target_amount - actual_total, 0.0)
             total_loss += shortage
             
             loss_details[f"{inst.request.source.name}->{inst.request.consumer.name}"] = {

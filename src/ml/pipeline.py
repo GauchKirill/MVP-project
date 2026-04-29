@@ -165,7 +165,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     # Инициализация начальных потоков
     if run_cfg.get('use_ml_initial_guess', False):
         print("\nЗагрузка ML модели для начального приближения...")
-        checkpoint = torch.load(run_cfg.ml_model_path, map_location=device, weights_only=False)
+        checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
         model = PathWeightNetwork(
             input_dim=checkpoint['feature_dim'],
             output_shape=checkpoint['output_shape'],
