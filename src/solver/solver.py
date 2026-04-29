@@ -493,3 +493,31 @@ class Solver:
         plt.savefig(filename, dpi=150)
         plt.show()
         print(f"Графики обучения сохранены в {filename}")
+
+    def get_directed_edge_flows(self) -> Dict[Tuple[str, str], float]:
+        """
+        Возвращает направленные потоки по рёбрам
+        Returns: {(from_node, to_node): flow}
+        """
+        desired_flows = {}
+        for inst_idx, inst in enumerate(self.instances):
+            for path in inst.get_paths():
+                path_key = inst._path_to_key(path)
+                desired_flows[(inst_idx, path_key)] = inst.path_flows[path_key]
+        
+        actual_flows = self.compute_actual_flows(desired_flows)
+        
+        directed = {}
+        for (inst_idx, path_key), flow in actual_flows.items():
+            inst = self.instances[inst_idx]
+            for path in inst.get_paths():
+                if inst._path_to_key(path) == path_key:
+                    for edge in path:
+                        u, v = edge.nodes[0].name, edge.nodes[1].name
+                        # Определяем направление: от предыдущего узла к следующему
+                        # (упрощённо: u=>v)
+                        key = (u, v)
+                        directed[key] = directed.get(key, 0.0) + flow
+                    break
+        
+        return directed

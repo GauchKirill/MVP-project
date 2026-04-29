@@ -2,6 +2,8 @@ import torch
 import json
 import numpy as np
 
+from graph import GraphView
+
 from .feature_extractor import FeatureExtractor
 from .model import PathWeightNetwork
 from .loss import EdgeFlowCalculator, PowerFlowLoss
@@ -153,6 +155,8 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
 
 def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     """Запуск солвера с опциональным ML-начальным приближением"""
+    
+    # Загружаем заявки
     with open(f"settings/{run_cfg.flows_file}") as f:
         base_flows = json.load(f)
 
@@ -163,9 +167,10 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Инициализация начальных потоков
-    if run_cfg.get('use_ml_initial_guess', False):
-        print("\nЗагрузка ML модели для начального приближения...")
-        checkpoint = torch.load(run_cfg.ml_model_path, map_location=device, weights_only=False)
+    if run_cfg.use_ml_initial_guess:
+        print("\n Загрузка ML модели для начального приближения\n")
+        
+        checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
         model = PathWeightNetwork(
             input_dim=checkpoint['feature_dim'],
             output_shape=checkpoint['output_shape'],
@@ -184,27 +189,51 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         with torch.no_grad():
             weights = model(features_tensor)[0].cpu().numpy()  # (S, C, max_paths)
 
-        # Переносим веса в FlowInstance
+        # Переносим ML-веса в FlowInstance как начальные потоки
+        initialized_count = 0
         for inst in instances:
             s_name = inst.request.source.name
             c_name = inst.request.consumer.name
+            
             if s_name not in extractor.source_to_idx or c_name not in extractor.consumer_to_idx:
                 continue
+            
             s_idx = extractor.source_to_idx[s_name]
             c_idx = extractor.consumer_to_idx[c_name]
-            w = weights[s_idx, c_idx, :]
+            w = weights[s_idx, c_idx, :]  # веса для всех путей этой пары
+            
             paths = inst.get_paths()
             inst.path_flows.clear()
+            
             for i, path in enumerate(paths):
                 key = inst._path_to_key(path)
-                inst.path_flows[key] = w[i] * inst.target_amount
-        print(" ! Начальное приближение от ML установлено.")
+                if i < len(w):
+                    inst.path_flows[key] = float(w[i]) * inst.target_amount
+                else:
+                    inst.path_flows[key] = 0.0
+            
+            initialized_count += 1
+        
+        print(f" ML-приближение установлено для {initialized_count} заявок")
+        
+        # Выводим статистику начального приближения
+        total_ml_flow = sum(inst.get_total_flow() for inst in instances)
+        total_target = sum(inst.target_amount for inst in instances)
+        print(f"  Суммарный поток (ML): {total_ml_flow:.2f} / {total_target:.2f} кВт")
+        print(f"  Точность ML: {total_ml_flow/total_target*100:.1f}%")
     else:
+        print("!! Используется равномерное начальное распределение !!")
+        
         for inst in instances:
             inst.set_uniform_flow()
-        print(" ! Равномерное начальное приближение установлено.")
+        
+        total_uniform = sum(inst.get_total_flow() for inst in instances)
+        total_target = sum(inst.target_amount for inst in instances)
+        print(f" Равномерное распределение: {total_uniform:.2f} / {total_target:.2f} кВт")
 
     # Запуск солвера
+    print(" Запуск градиентного спуска: ")
+    
     solver_cfg = train_cfg.solver
     solver = Solver(
         graph,
@@ -217,35 +246,65 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     solver.set_instances(instances)
     result = solver.optimize()
 
-    if result['success']:
-        print(f"\n Оптимизация завершена:")
-        print(f"  Итераций: {result['iterations']}")
-        print(f"  Суммарная недопоставка: {result['total_shortage']:.2f} кВт")
-        print(f"  Суммарное превышение: {result['capacity_violation']:.2f} кВт")
-    else:
-        print("Ошибка оптимизации:", result.get('message'))
-        return
+    if not result['success']:
+        print(" !!! Ошибка оптимизации:", result.get('message'))
+        return None
 
-    # Отчёты и визуализация (как в старом main.py)
+    print(" \n Результаты оптимизации:")
+    print(f"  Итераций: {result['iterations']}")
+    print(f"  Финальный loss: {result['final_loss']:.2f} кВт")
+    print(f"  Недопоставка: {result['total_shortage']:.2f} кВт")
+    print(f"  Превышение capacity: {result['capacity_violation']:.2f} кВт")
+
+    # Отчёт о доставке
+    print(" \n Отчет о доставке энергии: ")
+    
     delivery = solver.get_delivery_report()
-    print(f"\nВсего заявлено: {delivery['total_requested']:.2f} кВт")
+    print(f"Всего заявлено: {delivery['total_requested']:.2f} кВт")
     print(f"Доставлено: {delivery['total_delivered']:.2f} кВт")
     print(f"Недопоставлено: {delivery['total_shortage']:.2f} кВт "
           f"({delivery['total_shortage']/delivery['total_requested']*100:.2f}%)")
+    
+    print("\nДетали по заявкам (первые 10):")
+    for i, item in enumerate(delivery['items'][:10]):
+        status = "+" if item['shortage'] < 0.01 else f"- -{item['shortage']:.1f}"
+        print(f"  {i+1:2d}. {item['source']} → {item['consumer']}: "
+              f"{item['delivered']:.1f} / {item['requested']:.1f} кВт {status}")
+    if len(delivery['items']) > 10:
+        print(f"  ... и ещё {len(delivery['items'])-10} заявок")
 
+    # Отчёт о нарушениях пропускной способности
+    print(" !! Нарушения пропускной способности: ")
+    
     violations = solver.get_edge_violations()
     if violations:
-        print(f"\nРёбер с превышением: {len(violations)}")
+        print(f" Рёбер с превышением: {len(violations)}")
         for v in violations[:10]:
-            print(f"  {v['edge']}: capacity={v['capacity']:.2f}, flow={v['actual_flow']:.2f}, "
-                  f"excess={v['excess']:.2f} ({v['excess_pct']:.1f}%)")
+            print(f"  {v['edge']}: {v['actual_flow']:.2f} / {v['capacity']:.2f} кВт "
+                  f"(+{v['excess']:.2f}, {v['excess_pct']:.1f}%)")
+        if len(violations) > 10:
+            print(f"  ... и ещё {len(violations)-10}")
     else:
-        print("Нет рёбер с превышением пропускной способности.")
+        print(" Нет рёбер с превышением пропускной способности")
 
+    # Сравнение с ML-приближением (если использовалось)
+    if run_cfg.use_ml_initial_guess:
+        print("Сравнение с ML-приближением:")
+        print(f"  Улучшение недопоставки: {result['total_shortage']:.2f} кВт (солвер уточнил)")
+
+    # Визуализация
     if run_cfg.visualize_flows:
+        print("Визуализация решения:")
         view = GraphView(graph)
         edge_loads = solver.get_edge_loads()
-        view.draw_with_loads(edge_loads,
-                             filename=f"{train_cfg.paths.generated_folder}/solution_graph.html")
+        directed_flows = solver.get_directed_edge_flows()
+        
+        output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
+        view.draw_with_directed_flows(edge_loads, directed_flows, filename=output_path)
+    
+    # График обучения солвера
     solver.plot_training_history(
-        filename=f"{train_cfg.paths.generated_folder}/solver_history.png")
+        filename=f"{train_cfg.paths.generated_folder}/solver_history.png"
+    )
+
+    return result, solver
