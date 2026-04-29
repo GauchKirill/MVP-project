@@ -1,18 +1,19 @@
 {
   "training": {
-    "num_samples_per_level": 1000,
-    "sparsity_levels": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-    "batch_size": 128,
-    "epochs": 200,
-    "learning_rate": 1e-4,
-    "early_stopping_patience": 10
+    "num_samples_per_level": 200,
+    "sparsity_levels": [0.3, 0.7],
+    "demand_scale_factors": [0.1, 0.3],
+    "batch_size": 32,
+    "epochs": 50,
+    "learning_rate": 1e-3,
+    "early_stopping_patience": 8
   },
   "model": {
     "hidden_dims": [512, 256, 128],
     "dropout_rate": 0.3
   },
   "loss": {
-    "capacity_weight": 10.0,
+    "capacity_weight": 20.0,
     "demand_weight": 1.0
   },
   "solver": {
@@ -20,11 +21,10 @@
     "max_iter": 5000,
     "epsilon": 1e-6,
     "gradient_epsilon_rel": 0.01,
-    "capacity_weight": 3.0,
+    "capacity_weight": 5.0,
     "excess_weight": 1.5,
     "verbose": true
   },
-
   "visualization": {
     "training": true,
     "flows": true,

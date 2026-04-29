@@ -56,7 +56,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
     )
     raw_features, _, scenarios = generator.generate_samples(
         num_samples=train_cfg.training.num_samples_per_level,
-        sparsity_levels=train_cfg.training.sparsity_levels
+        sparsity_levels=train_cfg.training.sparsity_levels,
+        demand_scale_factors=train_cfg.training.demand_scale_factors
     )
     train_features, capacity_masks = extractor.normalize_features(raw_features)
 
