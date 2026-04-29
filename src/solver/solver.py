@@ -531,21 +531,23 @@ class Solver:
 
     def get_directed_edge_flows(self) -> Dict[Tuple[str, str], float]:
         """
-        Возвращает направленные потоки по рёбрам.
+        Возвращает направленные фактические потоки по рёбрам.
         
         Returns:
-            {(from_node, to_node): flow} — словарь направленных потоков
+            {(from_node, to_node): flow} — фактические потоки после ограничений
         """
-        desired_flows = {}
+        # Получаем текущие оптимизируемые потоки
+        current_flows = {}
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
                 path_key = inst._path_to_key(path)
-                desired_flows[(inst_idx, path_key)] = inst.path_flows[path_key]
+                current_flows[(inst_idx, path_key)] = inst.path_flows[path_key]
         
-        actual_flows = self.compute_actual_flows(desired_flows)
+        # Применяем ограничения — получаем фактические потоки
+        actual_flows = self.compute_actual_flows(current_flows)
         
+        # Суммируем направленные потоки
         directed = {}
-        
         for (inst_idx, path_key), flow in actual_flows.items():
             if flow <= 0:
                 continue
@@ -560,12 +562,8 @@ class Solver:
                         else:
                             next_node = edge.nodes[0]
                         
-                        from_name = current_node.name
-                        to_name = next_node.name
-                        
-                        key = (from_name, to_name)
+                        key = (current_node.name, next_node.name)
                         directed[key] = directed.get(key, 0.0) + flow
-                        
                         current_node = next_node
                     break
         

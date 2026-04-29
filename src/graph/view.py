@@ -243,7 +243,7 @@ class GraphView:
 
     def draw_with_directed_flows(self, edge_loads, directed_flows, filename="solution_graph.html"):
         """
-        Визуализация с направленными потоками.
+        Визуализация с направленными потоками
         
         Args:
             edge_loads: {Edge: (total_flow, load_ratio)} — суммарные потоки и загрузка
@@ -336,7 +336,7 @@ class GraphView:
             else:
                 cap_str = f"{cap:.1f}"
             
-            # Подсказка при наведении — ИСПОЛЬЗУЕМ \n вместо <br>
+            # Подсказка при наведении
             title = (
                 f"Ребро: {u} ↔ {v}\n"
                 f"Направление: {direction}\n"
@@ -350,7 +350,24 @@ class GraphView:
                 f"Загрузка: {ratio*100:.1f}%"
             )
             
-            net.add_edge(u, v, title=title, color=color, width=width, arrows='to')
+            # Если поток течёт в обе стороны — добавляем ДВА ребра
+            if flow_uv > 0 and flow_vu > 0:
+                # Доминирующее направление (основное ребро)
+                if flow_uv >= flow_vu:
+                    net.add_edge(u, v, title=title, color=color, width=width, arrows='to')
+                    # Обратное направление (тонкая линия)
+                    back_width = max(1, (flow_vu / max(flow_uv, 1)) * width)
+                    net.add_edge(v, u, title=title, color='#95a5a6', width=back_width, arrows='to')
+                else:
+                    net.add_edge(v, u, title=title, color=color, width=width, arrows='to')
+                    back_width = max(1, (flow_uv / max(flow_vu, 1)) * width)
+                    net.add_edge(u, v, title=title, color='#95a5a6', width=back_width, arrows='to')
+            else:
+                # Поток только в одну сторону
+                if flow_uv > 0:
+                    net.add_edge(u, v, title=title, color=color, width=width, arrows='to')
+                else:
+                    net.add_edge(v, u, title=title, color=color, width=width, arrows='to')
 
         # Генерируем HTML
         html = net.generate_html()
@@ -373,11 +390,13 @@ class GraphView:
             <span style="color:#e74c3c;">■ Критическая &gt;95%</span><br>
             <span style="color:#f39c12;">■ Высокая 70-95%</span><br>
             <span style="color:#f1c40f;">■ Средняя 30-70%</span><br>
-            <span style="color:#2ecc71;">■ Низкая &lt;30%</span><br><br>
+            <span style="color:#2ecc71;">■ Низкая &lt;30%</span><br>
+            <span style="color:#95a5a6;">■ Обратный поток</span><br><br>
             
             <small>
-            • Стрелка → доминирующее направление<br>
-            • Толщина линии ∝ загрузке<br>
+            • Стрелка → направление потока<br>
+            • Толщина линии ∝ величине потока<br>
+            • Серый цвет — обратное направление<br>
             • При наведении — детали потоков
             </small>
         </div>
@@ -387,4 +406,3 @@ class GraphView:
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html)
         print(f" Граф с направленными потоками сохранён в {filename}")
-
