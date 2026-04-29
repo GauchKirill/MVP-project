@@ -7,12 +7,11 @@ import numpy as np
 
 class PathWeightNetwork(nn.Module):
     """
-    Нейросеть для предсказания весов распределения потоков по путям.
+    Нейронная модель для предсказания весов распределения потоков по путям
     
     Вход: вектор признаков размерности E + S*C
     Выход: тензор размера (S, C, max_paths) с весами путей
     """
-    
     def __init__(self, 
                 input_dim: int,
                 output_shape: Tuple[int, int, int],
@@ -61,7 +60,7 @@ class PathWeightNetwork(nn.Module):
         self._init_weights()
     
     def _init_weights(self):
-        """Инициализация весов."""
+        """Инициализация весов"""
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 # Используем Kaiming инициализацию для ReLU
@@ -72,7 +71,7 @@ class PathWeightNetwork(nn.Module):
     
     def set_path_mask(self, mask: np.ndarray):
         """
-        Устанавливает маску для несуществующих путей.
+        Устанавливает маску для несуществующих путей
         
         Args:
             mask: numpy массив размера (S, C, max_paths) с 1 для существующих путей
@@ -81,8 +80,6 @@ class PathWeightNetwork(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Прямой проход.
-        
         Args:
             x: входной тензор размера (batch_size, input_dim)
             
@@ -100,7 +97,7 @@ class PathWeightNetwork(nn.Module):
         # Переформатируем в (batch_size, S, C, max_paths)
         logits = logits.view(batch_size, self.S, self.C, self.max_paths)
         
-        # Применяем маску (зануляем несуществующие пути перед softmax)
+        # Применяем мачку (зануляем несуществующие пути перед softmax)
         masked_logits = logits.masked_fill(self.path_mask == 0, float('-inf'))
         
         # Softmax по последнему измерению (по путям)
@@ -115,7 +112,7 @@ class PathWeightNetwork(nn.Module):
                     x: torch.Tensor, 
                     demands: torch.Tensor) -> torch.Tensor:
         """
-        Предсказывает потоки на основе весов и заявок.
+        Предсказывает потоки на основе весов и заявок
         
         Args:
             x: входной тензор признаков

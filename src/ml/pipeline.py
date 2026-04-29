@@ -1,6 +1,7 @@
 import torch
 import json
 import numpy as np
+
 from .feature_extractor import FeatureExtractor
 from .model import PathWeightNetwork
 from .loss import EdgeFlowCalculator, PowerFlowLoss
@@ -9,9 +10,9 @@ from .training import ModelTrainer
 from .data_generator import DataGenerator
 from graph import Graph, GraphView, RequestRegistry
 from solver import FlowsCreator, Solver, FlowInstance
+from .visualization import FlowVisualizer
 
 def print_results(results, extractor):
-    
     print(f"Заявлено: {results['demanded']:.1f} кВт")
     print(f"Доставлено: {results['total_delivered']:.1f} кВт")
     if results['demanded'] > 0:
@@ -26,7 +27,7 @@ def print_results(results, extractor):
     print(f"  - Высокая загрузка (70-95%): {len(high_load)}")
 
     if len(overloaded) > 0:
-        print(f"\n⚠️ Перегруженные рёбра:")
+        print(f"\n !! Перегруженные рёбра:")
         for idx in overloaded:
             edge = extractor.edges[idx]
             util = edge_utils[idx] * 100
@@ -118,7 +119,6 @@ def run_training(graph, registry, run_cfg, train_cfg):
 
     print_results(results, extractor)
     if train_cfg.visualization.flows:
-        from .visualization import FlowVisualizer
         fv = FlowVisualizer(graph, extractor, registry, train_cfg.paths.generated_folder)
         fv.create_flow_html(results, base_flows, 'flow_base.html', 'Базовый сценарий')
 
@@ -128,6 +128,7 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
 
     extractor = FeatureExtractor(graph, registry)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f" Device is {device}")
     checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
     model = PathWeightNetwork(
         input_dim=checkpoint['feature_dim'],
@@ -147,12 +148,11 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
 
     print_results(results, extractor)
     if run_cfg.visualize_flows:
-        from .visualization import FlowVisualizer
         fv = FlowVisualizer(graph, extractor, registry, train_cfg.paths.generated_folder)
         fv.create_flow_html(results, base_flows, 'flow_base.html', 'Базовый сценарий')
 
 def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
-    """Запуск солвера с опциональным ML-начальным приближением."""
+    """Запуск солвера с опциональным ML-начальным приближением"""
     with open(f"settings/{run_cfg.flows_file}") as f:
         base_flows = json.load(f)
 
@@ -198,11 +198,11 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
             for i, path in enumerate(paths):
                 key = inst._path_to_key(path)
                 inst.path_flows[key] = w[i] * inst.target_amount
-        print("✓ Начальное приближение от ML установлено.")
+        print(" ! Начальное приближение от ML установлено.")
     else:
         for inst in instances:
             inst.set_uniform_flow()
-        print("✓ Равномерное начальное приближение установлено.")
+        print(" ! Равномерное начальное приближение установлено.")
 
     # Запуск солвера
     solver_cfg = train_cfg.solver
@@ -218,7 +218,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     result = solver.optimize()
 
     if result['success']:
-        print(f"\n✓ Оптимизация завершена:")
+        print(f"\n Оптимизация завершена:")
         print(f"  Итераций: {result['iterations']}")
         print(f"  Суммарная недопоставка: {result['total_shortage']:.2f} кВт")
         print(f"  Суммарное превышение: {result['capacity_violation']:.2f} кВт")

@@ -1,18 +1,13 @@
-"""Модуль для визуализации графа электрической сети."""
-
 import os
 from pyvis.network import Network
 
-
 class GraphView:
-    """Класс для визуализации графа."""
-    
+    """Класс для визуализации графа"""
     def __init__(self, graph):
         self.graph = graph
 
     def draw_pyvis(self, filename="graph.html"):
-        """Интерактивная визуализация с PyVis."""
-        
+        """Интерактивная визуализация с PyVis"""
         net = Network(height="800px", width="100%", bgcolor="#ffffff")
         
         # Настройки физики для лучшего отображения

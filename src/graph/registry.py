@@ -1,5 +1,3 @@
-"""Модуль для управления реестром заявок."""
-
 from typing import List, Dict, Optional
 from .model import Graph, Node, Edge
 from .request import Request
@@ -7,7 +5,7 @@ from .path_finder import PathFinder
 
 
 class RequestRegistry:
-    """Класс для хранения и управления заявками."""
+    """класс для хранения и управления заявками"""
     
     def __init__(self, graph: Graph):
         self.graph = graph
@@ -16,7 +14,7 @@ class RequestRegistry:
     
     def generate_all_requests(self) -> int:
         """
-        Генерирует заявки для всех возможных пар источник-потребитель.
+        генерирует заявки для всех возможных пар источник-потребитель
         """
         sources = self.graph.get_sources()
         consumers = self.graph.get_consumers()
@@ -31,7 +29,7 @@ class RequestRegistry:
     
     def build_all_paths(self) -> None:
         """
-        Строит все возможные простые пути для каждой заявки.
+        строит все возможные простые пути для каждой заявки
         """
         total_paths = 0
         
@@ -47,7 +45,7 @@ class RequestRegistry:
             print(f"Построено путей: {total_paths} (в среднем {total_paths/len(self.requests):.1f} на заявку)")
     
     def get_statistics(self) -> Dict:
-        """Возвращает статистику по реестру."""
+        """возвращает статистику по реестру"""
         requests_with_paths = sum(1 for req in self.requests if req.paths)
         requests_without_paths = len(self.requests) - requests_with_paths
         
@@ -60,10 +58,8 @@ class RequestRegistry:
         }
     
     def print_all_paths_summary(self, max_per_request: int = 5):
-        """Выводит сводку по всем заявкам и их путям."""
-        print(f"\n{'='*60}")
-        print("СВОДКА ПО ВСЕМ ЗАЯВКАМ")
-        print(f"{'='*60}")
+        """выводит сводку по всем заявкам и их путям."""
+        print("\n ---Сводка по всем заявкам---")
         
         requests_with_paths = [req for req in self.requests if req.paths]
         requests_without_paths = [req for req in self.requests if not req.paths]
@@ -77,9 +73,7 @@ class RequestRegistry:
             for req in requests_without_paths:
                 print(f"  - {req.source.name} -> {req.consumer.name}")
         
-        print(f"\n{'='*60}")
-        print("ДЕТАЛИ ПО ЗАЯВКАМ С ПУТЯМИ")
-        print(f"{'='*60}")
+        print("\nДетали по заявкам с путями:")
         
         for req in requests_with_paths:
             paths_count = len(req.paths)
@@ -105,11 +99,9 @@ class RequestRegistry:
                     print(f"    ... и ещё {paths_count - max_per_request}")
     
     def print_request_paths(self, request: Request, max_display: int = 10):
-        """Выводит все пути для заданной заявки (для отладки)."""
-        print(f"\n{'='*60}")
+        """выводит все пути для заданной заявки (для отладки)"""
         print(f"Заявка: {request.source.name} -> {request.consumer.name}")
         print(f"Найдено путей: {len(request.paths)}")
-        print(f"{'='*60}")
         
         if not request.paths:
             print("Пути не найдены!")
@@ -131,7 +123,7 @@ class RequestRegistry:
             print(f"\n... и ещё {len(sorted_paths) - max_display} путей")
     
     def _format_path(self, path: List[Edge], start_node: Node) -> str:
-        """Форматирует путь в читаемую строку."""
+        """форматирует путь в читаемую строку"""
         if not path:
             return "путь не найден"
         

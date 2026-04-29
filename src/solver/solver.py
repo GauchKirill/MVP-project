@@ -1,12 +1,11 @@
-"""Решатель задачи распределения потоков с помощью градиентного спуска."""
-
 from typing import List, Dict, Tuple
 from graph import Edge, Graph
+import matplotlib.pyplot as plt
+
 from .flow_instance import FlowInstance
 
-
 class Solver:
-    """Решает задачу максимизации доставки энергии с учётом пропускных способностей."""
+    """Решает задачу максимизации доставки энергии с учётом пропускных способностей"""
     
     def __init__(self, 
                 graph: Graph, 
@@ -29,12 +28,12 @@ class Solver:
         self._edge_to_flows: Dict[Edge, List[Tuple[int, tuple]]] = {}
     
     def set_instances(self, instances: List[FlowInstance]):
-        """Устанавливает список экземпляров потоков."""
+        """Устанавливает список экземпляров потоков"""
         self.instances = instances
         self._build_edge_index()
     
     def _build_edge_index(self):
-        """Строит индекс для быстрого определения потоков через каждое ребро."""
+        """Строит индекс для быстрого определения потоков через каждое ребро"""
         self._edge_to_flows.clear()
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
@@ -45,12 +44,12 @@ class Solver:
                     self._edge_to_flows[edge].append((inst_idx, path_key))
     
     def initialize_uniform(self):
-        """Инициализирует равномерное распределение целевого потока по путям."""
+        """Инициализирует равномерное распределение целевого потока по путям"""
         for inst in self.instances:
             inst.set_uniform_flow()
     
     def compute_edge_total_flow(self, edge: Edge) -> float:
-        """Вычисляет суммарный поток через данное ребро."""
+        """Вычисляет суммарный поток через данное ребро"""
         total = 0.0
         if edge in self._edge_to_flows:
             for inst_idx, path_key in self._edge_to_flows[edge]:
@@ -61,7 +60,7 @@ class Solver:
     def compute_actual_flows(self, desired_flows: Dict[Tuple[int, tuple], float]) -> Dict[Tuple[int, tuple], float]:
         """
         Вычисляет фактические потоки после применения ограничений пропускной способности
-        и правила пропорционального ограничения.
+        и правила пропорционального ограничения
         """
         actual_flows = {}
         for key, flow in desired_flows.items():
@@ -155,7 +154,7 @@ class Solver:
 
     def compute_loss(self) -> Tuple[float, Dict[str, float]]:
         """
-        Вычисляет значение функции потерь.
+        Вычисляет значение функции потерь
         Loss = сумма по всем заявкам (target_amount - actual_flow)
         (только положительная недопоставка)
         """
@@ -198,8 +197,7 @@ class Solver:
     
     def compute_gradients(self) -> Dict[Tuple[int, tuple], float]:
         """
-        Вычисляет градиенты функции потерь.
-        Использует конечные разности с относительным шагом.
+        Вычисляет градиенты функции потерь (ипользует конечные разности с относительным шагом)
         """
         gradients: Dict[Tuple[int, tuple], float] = {}
         
@@ -246,7 +244,7 @@ class Solver:
         return gradients
     
     def optimize(self) -> Dict:
-        """Выполняет градиентный спуск."""
+        """Выполняет градиентный спуск"""
         if not self.instances:
             return {'success': False, 'message': 'Нет экземпляров потоков'}
         
@@ -359,7 +357,7 @@ class Solver:
     
     def get_edge_loads(self) -> Dict[Edge, Tuple[float, float]]:
         """
-        Возвращает словарь с фактическим потоком и загрузкой каждого ребра.
+        Возвращает словарь с фактическим потоком и загрузкой каждого ребра
         Returns: {edge: (flow, load_ratio)}
         """
         loads = {}
@@ -396,7 +394,7 @@ class Solver:
         return loads
     
     def get_delivery_report(self) -> Dict:
-        """Возвращает отчёт о доставке энергии по заявкам."""
+        """Возвращает отчёт о доставке энергии по заявкам"""
         report = []
         total_delivered = 0.0
         total_requested = 0.0
@@ -427,7 +425,7 @@ class Solver:
         }
     
     def get_edge_violations(self) -> List[Dict]:
-        """Возвращает список рёбер с превышением пропускной способности."""
+        """Возвращает список рёбер с превышением пропускной способности"""
         violations = []
         for edge in self.graph.edges:
             if edge.capacity == float('inf'):
@@ -444,9 +442,7 @@ class Solver:
         return violations
     
     def plot_training_history(self, filename="training_history.png"):
-        """Строит графики процесса обучения."""
-        import matplotlib.pyplot as plt
-        
+        """Строит графики процесса обучения"""
         if not self.loss_history:
             print("Нет истории обучения")
             return

@@ -1,11 +1,9 @@
-"""Класс для хранения текущего распределения потока по путям заявки."""
-
 from typing import Dict, List, Optional
 from graph import Request, Edge
 
 
 class FlowInstance:
-    """Представляет текущее распределение потока для конкретной заявки."""
+    """Представляет текущее распределение потока для конкретной заявки"""
     
     def __init__(self, request: Request, target_amount: float):
         self.request = request
@@ -22,11 +20,11 @@ class FlowInstance:
     
     @staticmethod
     def _path_to_key(path: List[Edge]) -> tuple:
-        """Преобразует путь в кортеж id рёбер для использования в словаре."""
+        """Преобразует путь в кортеж id рёбер для использования в словаре"""
         return tuple(id(edge) for edge in path)
     
     def set_uniform_flow(self):
-        """Равномерно распределяет целевой поток по всем доступным путям."""
+        """Равномерно распределяет целевой поток по всем доступным путям"""
         if not self.request.paths:
             return
         per_path = self.target_amount / len(self.request.paths)
@@ -35,16 +33,16 @@ class FlowInstance:
             self.path_flows[key] = per_path
     
     def get_total_flow(self) -> float:
-        """Возвращает суммарный поток по всем путям данной заявки."""
+        """Возвращает суммарный поток по всем путям данной заявки"""
         return sum(self.path_flows.values())
     
     def get_path_flow(self, path: List[Edge]) -> float:
-        """Возвращает поток по конкретному пути."""
+        """Возвращает поток по конкретному пути"""
         key = self._path_to_key(path)
         return self.path_flows.get(key, 0.0)
     
     def update_path_flow(self, path: List[Edge], delta: float):
-        """Изменяет поток по пути на delta (с ограничением неотрицательности)."""
+        """Изменяет поток по пути на delta (с ограничением неотрицательности)"""
         key = self._path_to_key(path)
         if key in self.path_flows:
             new_val = self.path_flows[key] + delta
@@ -53,5 +51,5 @@ class FlowInstance:
             self.path_flows[key] = new_val
     
     def get_paths(self) -> List[List[Edge]]:
-        """Возвращает список путей данной заявки."""
+        """Возвращает список путей данной заявки"""
         return self.request.paths

@@ -1,5 +1,4 @@
-"""Генерация синтетических данных для обучения нейросети."""
-
+import os
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 from scipy.stats import qmc
@@ -10,13 +9,12 @@ from sklearn.preprocessing import StandardScaler
 
 class DataGenerator:
     """
-    Генератор обучающих данных с использованием Latin Hypercube Sampling.
+    Генератор обучающих данных с использованием Latin Hypercube Sampling
     
-    Генерирует точки в единичном гиперкубе [0, 1]^(E + S*C).
-    Часть capacity-признаков заменяется на inf согласно уровню разреженности.
-    Нормализация выполняется позже через FeatureExtractor.normalize_features().
+    Генерирует точки в единичном гиперкубе [0, 1]^(E + S*C)
+    Часть capacity-признаков заменяется на inf согласно уровню разреженности
+    Нормализация выполняется позже через FeatureExtractor.normalize_features()
     """
-    
     def __init__(self, 
                  feature_dim: int,
                  sources: List[str],
@@ -33,7 +31,7 @@ class DataGenerator:
                      num_samples: int,
                      sparsity_levels: List[float] = [0.3, 0.7]) -> Tuple[np.ndarray, np.ndarray, List[Dict]]:
         """
-        Генерирует сценарии.
+        Генерирует сценарии
         
         Args:
             num_samples: количество сэмплов на каждый уровень разреженности
@@ -80,14 +78,14 @@ class DataGenerator:
                 val = row[offset + idx]
                 demands_matrix[i, s_idx, c_idx] = val
         
-        print(f"\n✓ Сгенерировано {len(all_scenarios)} сценариев")
+        print(f"\n !Сгенерировано {len(all_scenarios)} сценариев!")
         print(f"  - Размер матрицы признаков: {all_features.shape}")
         print(f"  - Диапазон demands: [{demands_matrix.min():.4f}, {demands_matrix.max():.4f}]")
         
         return all_features, demands_matrix, all_scenarios
     
     def _row_to_flows(self, row: np.ndarray) -> Dict:
-        """Преобразует строку признаков в словарь заявок (для отладки)."""
+        """Преобразует строку признаков в словарь заявок (для отладки)"""
         flows = {s: {} for s in self.sources}
         offset = self.E
         for idx, (s_name, c_name) in enumerate(self.all_pairs):
@@ -99,12 +97,10 @@ class DataGenerator:
 
 class DataVisualizer:
     """
-    Визуализация сгенерированных данных с помощью PCA.
+    Визуализация сгенерированных данных с помощью PCA (слишком много информации теряется при таком сильном снижении размереости)
     """
-    
     def __init__(self, save_dir: str = 'genereted'):
         self.save_dir = save_dir
-        import os
         os.makedirs(save_dir, exist_ok=True)
     
     def visualize_pca(self, 
@@ -113,8 +109,7 @@ class DataVisualizer:
                       save_name: str = 'pca_visualization.png',
                       show: bool = True) -> None:
         """
-        Визуализирует данные в проекции на первые 3 главные компоненты PCA.
-        inf заменяются на 0 для визуализации.
+        Визуализирует данные в проекции на первые 3 главные компоненты PCA, inf заменяются на 0 для визуализации
         """
         features_clean = np.where(np.isfinite(features), features, 0.0)
         
@@ -199,7 +194,6 @@ class DataVisualizer:
         
         plt.tight_layout()
         
-        import os
         save_path = os.path.join(self.save_dir, save_name)
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
         
@@ -208,7 +202,7 @@ class DataVisualizer:
         else:
             plt.close()
         
-        print(f"✓ PCA визуализация сохранена в {save_path}")
+        print(f"\n !PCA визуализация сохранена в {save_path}!")
         print(f"  - PC1 объясняет {pca.explained_variance_ratio_[0]*100:.1f}% дисперсии")
     
     def visualize_distribution(self,
@@ -216,7 +210,7 @@ class DataVisualizer:
                                save_name: str = 'distribution.png',
                                show: bool = True) -> None:
         """
-        Визуализирует распределение значений признаков.
+        Визуализирует распределение значений признаков
         """
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         
@@ -255,8 +249,7 @@ class DataVisualizer:
                fontsize=9)
         
         plt.tight_layout()
-        
-        import os
+
         save_path = os.path.join(self.save_dir, save_name)
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
         
@@ -265,4 +258,4 @@ class DataVisualizer:
         else:
             plt.close()
         
-        print(f"✓ Распределение признаков сохранено в {save_path}")
+        print(f"\n !Распределение признаков сохранено в {save_path}!")

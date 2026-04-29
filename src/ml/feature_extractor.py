@@ -1,5 +1,3 @@
-"""Извлечение признаков для нейросетевой модели."""
-
 import numpy as np
 from typing import Dict, List, Tuple, Optional
 import sys
@@ -9,10 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from graph import Graph, RequestRegistry, Request
 
-
 class FeatureExtractor:
     """
-    Преобразует состояние сети и заявки в вектор признаков фиксированной размерности.
+    Преобразует состояние сети и заявки (человекочитаемые данные) в векторы признаков (для дальнейшего применения метрических алгоритмов)
     
     Размерность вектора: E + S*C, где:
     - E: количество рёбер в графе
@@ -52,7 +49,7 @@ class FeatureExtractor:
         self.max_paths = self._find_max_paths()
         
     def _find_max_paths(self) -> int:
-        """Находит максимальное количество путей среди всех заявок."""
+        """Находит максимальное количество путей среди всех заявок"""
         max_paths = 0
         for request in self.registry.requests:
             if request.paths:
@@ -61,7 +58,7 @@ class FeatureExtractor:
     
     def build_raw_features(self, flows: Dict[str, Dict[str, float]]) -> np.ndarray:
         """
-        Строит сырой вектор признаков (без нормализации) из словаря заявок.
+        Строит сырой вектор признаков (без нормализации) из словаря заявок
         
         Args:
             flows: словарь вида {source: {consumer: demand}}
@@ -71,11 +68,11 @@ class FeatureExtractor:
         """
         features = np.zeros(self.feature_dim, dtype=np.float32)
         
-        # 1. Capacity рёбер
+        # добавляем capacity для всех рёбер
         for i, edge in enumerate(self.edges):
             features[i] = edge.capacity  # float('inf') для неограниченных
         
-        # 2. Заявки
+        # добавляем все заданные заявки
         offset = self.E
         for s_name, consumers in flows.items():
             if s_name not in self.source_to_idx:
@@ -92,9 +89,9 @@ class FeatureExtractor:
     def normalize_features(self, features: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Нормализует признаки:
-        1. Находит глобальный максимум по всем конечным элементам (capacity + demands).
-        2. Конечные значения делятся на этот максимум, inf остаются inf.
-        3. inf заменяются на 1.0.
+        1. Находит глобальный максимум по всем конечным элементам (capacity + demands)
+        2. Конечные значения делятся на этот максимум, inf остаются inf
+        3. inf заменяются на 1.0
         
         Args:
             features: (feature_dim,) или (batch_size, feature_dim)
@@ -140,11 +137,11 @@ class FeatureExtractor:
             return features, capacity_mask
     
     def get_output_shape(self) -> Tuple[int, int, int]:
-        """Возвращает форму выходного тензора: (S, C, max_paths)."""
+        """Возвращает форму выходного тензора: (S, C, max_paths)"""
         return (self.S, self.C, self.max_paths)
     
     def create_path_mask(self) -> np.ndarray:
-        """Создаёт маску для выходного слоя: 1 для существующих путей, 0 для несуществующих."""
+        """Создаёт маску для выходного слоя: 1 для существующих путей, 0 для несуществующих"""
         mask = np.zeros((self.S, self.C, self.max_paths), dtype=np.float32)
         
         for request in self.registry.requests:
@@ -163,8 +160,8 @@ class FeatureExtractor:
     
     def get_edge_capacities(self) -> np.ndarray:
         """
-        Возвращает массив пропускных способностей рёбер.
-        Используется в loss-функции для вычисления превышений.
+        Возвращает массив пропускных способностей рёбер
+        Используется в loss-функции для вычисления превышений
         """
         caps = np.zeros(self.E, dtype=np.float32)
         for i, edge in enumerate(self.edges):

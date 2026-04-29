@@ -1,5 +1,3 @@
-"""Обучение нейросетевой модели."""
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -15,7 +13,7 @@ from .feature_extractor import FeatureExtractor
 
 class ModelTrainer:
     """
-    Класс для обучения модели распределения потоков.
+    Класс для обучения модели распределения потоков
     """
     
     def __init__(self,
@@ -47,7 +45,7 @@ class ModelTrainer:
                             weight_decay: float = 1e-5,
                             scheduler_patience: int = 20):
         """
-        Настраивает оптимизатор и планировщик.
+        Настраивает оптимизатор и планировщик
         """
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),

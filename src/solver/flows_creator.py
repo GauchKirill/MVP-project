@@ -1,5 +1,3 @@
-"""Загрузка ненулевых потоков из flows.json и создание FlowInstance."""
-
 import json
 from typing import List, Dict, Optional
 from graph import Graph, Request, RequestRegistry
@@ -7,7 +5,7 @@ from .flow_instance import FlowInstance
 
 
 class FlowsCreator:
-    """Создаёт FlowInstance на основе flows.json и построенных путей."""
+    """Создаёт FlowInstance на основе flows.json и построенных путей"""
     
     def __init__(self, graph: Graph, registry: RequestRegistry):
         self.graph = graph
@@ -15,7 +13,7 @@ class FlowsCreator:
     
     def create_from_file(self, flows_file: str) -> List[FlowInstance]:
         """
-        Загружает flows.json и создаёт FlowInstance только для ненулевых потоков.
+        Загружает flows.json и создаёт FlowInstance только для ненулевых потоков
         """
         with open(flows_file, 'r', encoding='utf-8') as f:
             flows_data = json.load(f)

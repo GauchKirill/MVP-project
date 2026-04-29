@@ -1,18 +1,21 @@
-"""Визуализация процесса обучения и результатов."""
+import copy
+import os
+import json
+
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+
+import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
-import numpy as np
-from typing import Dict, List, Optional, Tuple
-import os
-import json
-from datetime import datetime
 
+from pyvis.network import Network
 
 class TrainingVisualizer:
     """
-    Визуализация процесса обучения нейросети.
+    Визуализация процесса обучения нейросети
     """
     
     def __init__(self, save_dir: str = 'genereted'):
@@ -24,7 +27,7 @@ class TrainingVisualizer:
                             save_name: str = 'training_history.png',
                             show: bool = True) -> None:
         """
-        Строит графики обучения: loss и компоненты.
+        Строит графики обучения: loss и компоненты
         
         Args:
             history: словарь с историей обучения из ModelTrainer
@@ -35,7 +38,7 @@ class TrainingVisualizer:
         
         epochs = range(len(history['train_loss']))
         
-        # 1. Общий лосс
+        # общий лосс
         ax = axes[0, 0]
         ax.plot(epochs, history['train_loss'], 'b-', label='Train', linewidth=2)
         ax.plot(epochs, history['val_loss'], 'r-', label='Validation', linewidth=2)
@@ -45,7 +48,7 @@ class TrainingVisualizer:
         ax.legend()
         ax.grid(True, alpha=0.3)
         
-        # Отмечаем минимум валидационного лосса
+        # отмечаем минимум валидационного лосса
         if history['val_loss']:
             min_val_epoch = np.argmin(history['val_loss'])
             min_val_loss = history['val_loss'][min_val_epoch]
@@ -53,7 +56,7 @@ class TrainingVisualizer:
                    label=f'Мин. val: {min_val_loss:.4f}')
             ax.legend()
         
-        # 2. Компоненты лосса на train
+        # компоненты лосса на train
         ax = axes[0, 1]
         if history['train_components']:
             # Собираем данные по компонентам
@@ -73,7 +76,7 @@ class TrainingVisualizer:
             ax.legend()
             ax.grid(True, alpha=0.3)
         
-        # 3. Компоненты лосса на validation
+        # компоненты лосса на validation
         ax = axes[1, 0]
         if history['val_components']:
             components = {}
@@ -92,7 +95,7 @@ class TrainingVisualizer:
             ax.legend()
             ax.grid(True, alpha=0.3)
         
-        # 4. Дополнительные метрики
+        # дополнительные метрики
         ax = axes[1, 1]
         if history['val_components']:
             # Достаём delivery_ratio и avg_utilization
@@ -118,10 +121,10 @@ class TrainingVisualizer:
         
         plt.tight_layout()
         
-        # Сохраняем
+        # сохраняем
         save_path = os.path.join(self.save_dir, save_name)
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"✓ Графики обучения сохранены в {save_path}")
+        print(f" Графики обучения сохранены в {save_path}")
         
         if show:
             plt.show()
@@ -134,8 +137,7 @@ class TrainingVisualizer:
                                         save_name: str = 'learning_curves_comparison.png',
                                         show: bool = True) -> None:
         """
-        Сравнивает кривые обучения для разных запусков.
-        Полезно при подборе гиперпараметров.
+        Сравнивает кривые обучения для разных запусков (полезно при подборе гиперпараметров)
         """
         fig, axes = plt.subplots(1, 2, figsize=(14, 5))
         
@@ -175,7 +177,7 @@ class TrainingVisualizer:
 
 class FlowVisualizer:
     """
-    Визуализация результатов потокораспределения на графе.
+    Визуализация результатов потокораспределения на графе  --  сделать более воспринимаемой (сейчас прописанны суммы поток в две стороны)
     """
     
     def __init__(self, graph, feature_extractor, registry, save_dir: str = 'genereted'):
@@ -191,7 +193,7 @@ class FlowVisualizer:
                         save_name: str = 'flow_visualization.html',
                         title: str = 'Распределение потоков в сети «Альфа»') -> str:
         """
-        Создаёт интерактивную HTML визуализацию с потоками.
+        Создаёт интерактивную HTML визуализацию с потоками
         
         Args:
             results: результаты предсказания из FlowPredictor.predict()
@@ -202,8 +204,6 @@ class FlowVisualizer:
         Returns:
             путь к сохранённому файлу
         """
-        from pyvis.network import Network
-        
         net = Network(height="800px", width="100%", bgcolor="#ffffff")
         
         # Настройки физики
@@ -351,7 +351,7 @@ class FlowVisualizer:
         with open(save_path, 'w', encoding='utf-8') as f:
             f.write(html_content)
         
-        print(f"✓ Визуализация потоков сохранена в {save_path}")
+        print(f" Визуализация потоков сохранена в {save_path}")
         return save_path
     
     def plot_sensitivity_analysis(self,
@@ -363,7 +363,7 @@ class FlowVisualizer:
                                 save_name: str = 'sensitivity.png',
                                 show: bool = True) -> Dict:
         """
-        Анализ чувствительности: как меняется доставка при изменении заявок.
+        Анализ чувствительности: как меняется доставка при изменении заявок
         
         Args:
             predictor: FlowPredictor
@@ -377,8 +377,6 @@ class FlowVisualizer:
         Returns:
             словарь с результатами анализа
         """
-        import copy
-        
         multipliers = np.linspace(variation_range[0], variation_range[1], num_points)
         
         delivery_ratios = []
@@ -461,7 +459,7 @@ class FlowVisualizer:
                            flows: Dict,
                            save_name: str = 'results_report.json') -> None:
         """
-        Сохраняет подробный отчёт о результатах в JSON.
+        Сохраняет подробный отчёт о результатах в JSON
         """
         report = {
             'timestamp': datetime.now().isoformat(),
@@ -503,4 +501,4 @@ class FlowVisualizer:
         with open(save_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
         
-        print(f"✓ Отчёт сохранён в {save_path}")
+        print(f" Отчёт сохранён в {save_path}")

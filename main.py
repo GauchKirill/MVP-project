@@ -23,11 +23,11 @@ def main():
     registry.build_all_paths()
 
     mode = run_cfg.mode
-    if mode == 'train':
+    if mode == 'train':  # режим обучения на сгенерированных данных
         run_training(graph, registry, run_cfg, train_cfg)
-    elif mode == 'predict':
+    elif mode == 'predict':  # режим предсказания без переобучения (хорошее приближение для тестирования на новых данныз)
         run_prediction(graph, registry, run_cfg, train_cfg)
-    elif mode == 'solve':
+    elif mode == 'solve':  # режим точного решения (советуем выполнять после приближенного предсказания от ml решателя)
         run_solver_pipeline(graph, registry, run_cfg, train_cfg)
     else:
         raise ValueError(f"Неизвестный режим: {mode}")

@@ -1,5 +1,3 @@
-"""Пакет для решения задачи распределения потоков."""
-
 from .flow_instance import FlowInstance
 from .flows_creator import FlowsCreator
 from .solver import Solver

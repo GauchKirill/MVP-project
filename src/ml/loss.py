@@ -1,5 +1,3 @@
-"""Функция потерь для обучения модели распределения потоков."""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,12 +6,11 @@ from typing import Dict, List, Tuple, Optional
 
 class PowerFlowLoss(nn.Module):
     """
-    Функция потерь для оптимизации потокораспределения.
+    Функция потерь для оптимизации потокораспределения
     
-    loss_capacity: штраф за превышение пропускной способности (только для конечных capacity)
-    loss_demand: штраф за недопоставку относительно заявок
+    - loss_capacity: штраф за превышение пропускной способности (только для конечных capacity)
+    - loss_demand: штраф за -недо и -пере поставку относительно заявок
     """
-    
     def __init__(self,
                  capacity_weight: float = 1.0,
                  demand_weight: float = 1.0):
@@ -31,9 +28,9 @@ class PowerFlowLoss(nn.Module):
                 ) -> Tuple[torch.Tensor, Dict[str, float]]:
         """
         Args:
-            edge_capacities: (batch_size, E) — нормализованные capacity из признаков,
+            - edge_capacities: (batch_size, E) — нормализованные capacity из признаков,
                             где inf заменены на 1.0
-            capacity_mask: (batch_size, E) — 1.0 для конечных capacity, 0.0 для бывших inf
+            - capacity_mask: (batch_size, E) — 1.0 для конечных capacity, 0.0 для бывших inf
         """
         components = {}
         total_loss = torch.tensor(0.0, device=path_flows.device)
@@ -46,7 +43,7 @@ class PowerFlowLoss(nn.Module):
             edge_flows_masked = edge_flows
             edge_capacities_masked = edge_capacities
         
-        # 1. Capacity loss — превышение над замаскированной capacity
+        # capacity loss — превышение над замаскированной capacity
         capacity_violation = F.relu(edge_flows_masked - edge_capacities_masked)
         
 
@@ -55,14 +52,14 @@ class PowerFlowLoss(nn.Module):
         total_loss = total_loss + loss_capacity
         components['capacity'] = loss_capacity.item()
         
-        # 2. Demand loss
+        # demand loss
         delivered = path_flows.sum(dim=-1)
         shortage = torch.abs(demands - delivered)
         loss_demand = self.demand_weight * shortage.mean()
         total_loss = total_loss + loss_demand
         components['demand'] = loss_demand.item()
         
-        # Метрики
+        # метрики
         with torch.no_grad():
             if capacity_mask is not None and capacity_mask.sum() > 0:
                 edge_utils = edge_flows_masked / (edge_capacities_masked + 1e-8)
@@ -86,7 +83,7 @@ class PowerFlowLoss(nn.Module):
 
 class EdgeFlowCalculator:
     """
-    Вычисляет суммарные потоки на рёбрах на основе потоков по путям.
+    Вычисляет суммарные потоки на рёбрах на основе потоков по путям
     """
     
     def __init__(self, registry, feature_extractor):
@@ -95,7 +92,7 @@ class EdgeFlowCalculator:
         self.path_to_edges = self._build_path_to_edges_mapping()
     
     def _build_path_to_edges_mapping(self) -> Dict[Tuple[int, int, int], List[int]]:
-        """Строит отображение (s_idx, c_idx, path_idx) → список индексов рёбер."""
+        """Строит отображение (s_idx, c_idx, path_idx) → список индексов рёбер"""
         mapping = {}
         edge_to_idx = {edge: i for i, edge in enumerate(self.extractor.edges)}
         
@@ -122,7 +119,7 @@ class EdgeFlowCalculator:
     
     def compute_edge_flows(self, path_flows: torch.Tensor) -> torch.Tensor:
         """
-        Вычисляет суммарные потоки на рёбрах.
+        Вычисляет суммарные потоки на рёбрах
         
         Args:
             path_flows: (batch_size, S, C, max_paths)
