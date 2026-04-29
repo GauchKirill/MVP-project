@@ -297,10 +297,20 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         print("Визуализация решения:")
         view = GraphView(graph)
         edge_loads = solver.get_edge_loads()
-        directed_flows = solver.get_directed_edge_flows()
+        
+        # Желаемые потоки (до урезания)
+        desired_directed = solver.get_desired_directed_flows()
+        
+        # Фактические потоки (после ограничений)
+        actual_directed = solver.get_directed_edge_flows()
         
         output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
-        view.draw_with_directed_flows(edge_loads, directed_flows, filename=output_path)
+        view.draw_with_directed_flows(
+            edge_loads, 
+            actual_directed, 
+            desired_directed=desired_directed,
+            filename=output_path
+        )
     
     # График обучения солвера
     solver.plot_training_history(

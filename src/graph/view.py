@@ -241,13 +241,15 @@ class GraphView:
             f.write(html)
         print(f" Граф решения сохранён в {filename}")
 
-    def draw_with_directed_flows(self, edge_loads, directed_flows, filename="solution_graph.html"):
+    def draw_with_directed_flows(self, edge_loads, actual_directed, 
+                             desired_directed=None, filename="solution_graph.html"):
         """
-        Визуализация с направленными потоками
+        Визуализация с направленными потоками.
         
         Args:
             edge_loads: {Edge: (total_flow, load_ratio)} — суммарные потоки и загрузка
-            directed_flows: {(from_node, to_node): flow} — направленные потоки
+            actual_directed: {(from_node, to_node): flow} — фактические потоки после ограничений
+            desired_directed: {(from_node, to_node): flow} — желаемые потоки до ограничений (опционально)
             filename: имя выходного файла
         """
         net = Network(height="800px", width="100%", bgcolor="#ffffff")
@@ -305,17 +307,25 @@ class GraphView:
             u, v = edge.nodes[0].name, edge.nodes[1].name
             cap = edge.capacity if edge.capacity != float('inf') else float('inf')
             
-            # Направленные потоки
-            flow_uv = directed_flows.get((u, v), 0.0)
-            flow_vu = directed_flows.get((v, u), 0.0)
+            # Фактические направленные потоки
+            actual_uv = actual_directed.get((u, v), 0.0)
+            actual_vu = actual_directed.get((v, u), 0.0)
             
-            # Определяем доминирующее направление и чистый поток
-            if flow_uv >= flow_vu:
+            # Желаемые направленные потоки (если переданы)
+            if desired_directed:
+                desired_uv = desired_directed.get((u, v), 0.0)
+                desired_vu = desired_directed.get((v, u), 0.0)
+            else:
+                desired_uv = actual_uv
+                desired_vu = actual_vu
+            
+            # Определяем доминирующее направление для стрелки
+            if actual_uv >= actual_vu:
                 direction_text = f"{u} → {v}"
-                net_flow = flow_uv - flow_vu
+                net_flow = actual_uv - actual_vu
             else:
                 direction_text = f"{v} → {u}"
-                net_flow = flow_vu - flow_uv
+                net_flow = actual_vu - actual_uv
             
             # Цвет по загрузке
             if ratio > 0.95:
@@ -336,13 +346,20 @@ class GraphView:
             else:
                 cap_str = f"{cap:.1f}"
             
-            title = (f"<b>Ребро: {u} ↔ {v}</b><br>"
-                    f"Доминирующее направление: {direction_text}<br>"
-                    f"Чистый поток: {net_flow:.2f} кВт<br>"
+            # Собираем title
+            title = f"<b>Ребро: {u} ↔ {v}</b><br>"
+            
+            if desired_directed is not None and (desired_uv != actual_uv or desired_vu != actual_vu):
+                title += (f"<i>Желаемые потоки (до ограничений):</i><br>"
+                        f"{u} → {v}: {desired_uv:.2f} кВт<br>"
+                        f"{v} → {u}: {desired_vu:.2f} кВт<br>"
+                        f"<hr>"
+                        f"<i>Фактические потоки (после ограничений):</i><br>")
+            
+            title += (f"{u} → {v}: {actual_uv:.2f} кВт<br>"
+                    f"{v} → {u}: {actual_vu:.2f} кВт<br>"
                     f"<hr>"
-                    f"Поток {u} → {v}: {flow_uv:.2f} кВт<br>"
-                    f"Поток {v} → {u}: {flow_vu:.2f} кВт<br>"
-                    f"<hr>"
+                    f"Чистый поток: {net_flow:.2f} кВт ({direction_text})<br>"
                     f"Суммарный поток: {total_flow:.2f} / {cap_str} кВт<br>"
                     f"Загрузка: {ratio*100:.1f}%")
             
