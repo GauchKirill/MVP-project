@@ -531,65 +531,42 @@ class Solver:
 
     def get_directed_edge_flows(self) -> Dict[Tuple[str, str], float]:
         """
-        Возвращает направленные потоки по рёбрам с учётом всех маршрутов
+        Возвращает направленные потоки по рёбрам.
         
         Returns:
             {(from_node, to_node): flow} — словарь направленных потоков
         """
-        # Получаем желаемые потоки из текущего состояния
         desired_flows = {}
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
                 path_key = inst._path_to_key(path)
                 desired_flows[(inst_idx, path_key)] = inst.path_flows[path_key]
         
-        # Получаем фактические потоки после всех ограничений
         actual_flows = self.compute_actual_flows(desired_flows)
         
-        # Суммируем направленные потоки по рёбрам
         directed = {}
         
         for (inst_idx, path_key), flow in actual_flows.items():
-            if flow <= 0.001:  # игнорируем очень маленькие потоки
+            if flow <= 0:
                 continue
             
             inst = self.instances[inst_idx]
-            
-            # Находим путь по ключу
-            target_path = None
             for path in inst.get_paths():
                 if inst._path_to_key(path) == path_key:
-                    target_path = path
+                    current_node = inst.request.source
+                    for edge in path:
+                        if edge.nodes[0] == current_node:
+                            next_node = edge.nodes[1]
+                        else:
+                            next_node = edge.nodes[0]
+                        
+                        from_name = current_node.name
+                        to_name = next_node.name
+                        
+                        key = (from_name, to_name)
+                        directed[key] = directed.get(key, 0.0) + flow
+                        
+                        current_node = next_node
                     break
-            
-            if target_path is None:
-                continue
-            
-            # Восстанавливаем маршрут: от источника к потребителю
-            current_node = inst.request.source
-            
-            for edge in target_path:
-                # Определяем следующий узел в пути
-                if edge.nodes[0] == current_node:
-                    next_node = edge.nodes[1]
-                elif edge.nodes[1] == current_node:
-                    next_node = edge.nodes[0]
-                else:
-                    # Ребро не соединено с текущим узлом — такого быть не должно
-                    # Ищем правильное направление
-                    if current_node in edge.nodes:
-                        next_node = edge.nodes[0] if edge.nodes[1] == current_node else edge.nodes[1]
-                    else:
-                        # Пропускаем, если не можем определить
-                        break
-                
-                from_name = current_node.name
-                to_name = next_node.name
-                
-                key = (from_name, to_name)
-                directed[key] = directed.get(key, 0.0) + flow
-                
-                # Переходим к следующему узлу
-                current_node = next_node
         
         return directed

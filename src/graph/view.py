@@ -241,15 +241,13 @@ class GraphView:
             f.write(html)
         print(f" Граф решения сохранён в {filename}")
 
-    def draw_with_directed_flows(self, edge_loads, actual_directed, 
-                             desired_directed=None, filename="solution_graph.html"):
+    def draw_with_directed_flows(self, edge_loads, directed_flows, filename="solution_graph.html"):
         """
         Визуализация с направленными потоками.
         
         Args:
             edge_loads: {Edge: (total_flow, load_ratio)} — суммарные потоки и загрузка
-            actual_directed: {(from_node, to_node): flow} — фактические потоки после ограничений
-            desired_directed: {(from_node, to_node): flow} — желаемые потоки до ограничений (опционально)
+            directed_flows: {(from_node, to_node): flow} — направленные потоки
             filename: имя выходного файла
         """
         net = Network(height="800px", width="100%", bgcolor="#ffffff")
@@ -302,30 +300,23 @@ class GraphView:
                 size=25 if node.type in ['source', 'consumer'] else 15
             )
 
-        # Добавляем рёбра с направленными потоками
+        # Добавляем рёбра
         for edge, (total_flow, ratio) in edge_loads.items():
-            u, v = edge.nodes[0].name, edge.nodes[1].name
+            u = edge.nodes[0].name
+            v = edge.nodes[1].name
             cap = edge.capacity if edge.capacity != float('inf') else float('inf')
             
-            # Фактические направленные потоки
-            actual_uv = actual_directed.get((u, v), 0.0)
-            actual_vu = actual_directed.get((v, u), 0.0)
+            # Направленные потоки
+            flow_uv = directed_flows.get((u, v), 0.0)
+            flow_vu = directed_flows.get((v, u), 0.0)
             
-            # Желаемые направленные потоки (если переданы)
-            if desired_directed:
-                desired_uv = desired_directed.get((u, v), 0.0)
-                desired_vu = desired_directed.get((v, u), 0.0)
+            # Чистый поток и направление
+            if flow_uv >= flow_vu:
+                direction = f"{u} → {v}"
+                net_flow = flow_uv - flow_vu
             else:
-                desired_uv = actual_uv
-                desired_vu = actual_vu
-            
-            # Определяем доминирующее направление для стрелки
-            if actual_uv >= actual_vu:
-                direction_text = f"{u} → {v}"
-                net_flow = actual_uv - actual_vu
-            else:
-                direction_text = f"{v} → {u}"
-                net_flow = actual_vu - actual_uv
+                direction = f"{v} → {u}"
+                net_flow = flow_vu - flow_uv
             
             # Цвет по загрузке
             if ratio > 0.95:
@@ -337,31 +328,27 @@ class GraphView:
             else:
                 color = '#2ecc71'
             
-            # Толщина ребра пропорциональна загрузке
             width = max(2, ratio * 5)
             
-            # Подпись при наведении
+            # Форматируем capacity
             if cap == float('inf'):
                 cap_str = "∞"
             else:
                 cap_str = f"{cap:.1f}"
             
-            # Собираем title
-            title = f"<b>Ребро: {u} ↔ {v}</b><br>"
-            
-            if desired_directed is not None and (desired_uv != actual_uv or desired_vu != actual_vu):
-                title += (f"<i>Желаемые потоки (до ограничений):</i><br>"
-                        f"{u} → {v}: {desired_uv:.2f} кВт<br>"
-                        f"{v} → {u}: {desired_vu:.2f} кВт<br>"
-                        f"<hr>"
-                        f"<i>Фактические потоки (после ограничений):</i><br>")
-            
-            title += (f"{u} → {v}: {actual_uv:.2f} кВт<br>"
-                    f"{v} → {u}: {actual_vu:.2f} кВт<br>"
-                    f"<hr>"
-                    f"Чистый поток: {net_flow:.2f} кВт ({direction_text})<br>"
-                    f"Суммарный поток: {total_flow:.2f} / {cap_str} кВт<br>"
-                    f"Загрузка: {ratio*100:.1f}%")
+            # Подсказка при наведении — ИСПОЛЬЗУЕМ \n вместо <br>
+            title = (
+                f"Ребро: {u} ↔ {v}\n"
+                f"Направление: {direction}\n"
+                f"Чистый поток: {net_flow:.2f} кВт\n"
+                f"────────────────\n"
+                f"Поток {u} → {v}: {flow_uv:.2f} кВт\n"
+                f"Поток {v} → {u}: {flow_vu:.2f} кВт\n"
+                f"────────────────\n"
+                f"Суммарный поток: {total_flow:.2f} кВт\n"
+                f"Максимум: {cap_str} кВт\n"
+                f"Загрузка: {ratio*100:.1f}%"
+            )
             
             net.add_edge(u, v, title=title, color=color, width=width, arrows='to')
 
@@ -369,11 +356,11 @@ class GraphView:
         html = net.generate_html()
 
         # Легенда
-        legend = f"""
+        legend = """
         <div style="position: absolute; top: 10px; right: 10px; background: white;
                     padding: 15px; border: 1px solid #ccc; border-radius: 8px;
                     z-index: 1000; font-family: Arial, sans-serif; 
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 250px;">
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 230px;">
             <b style="font-size: 14px;">Легенда</b><br><br>
             
             <b>Типы узлов:</b><br>
@@ -383,10 +370,10 @@ class GraphView:
             <span style="color:#f39c12;">◆ Вспомогательный</span><br><br>
             
             <b>Загрузка рёбер:</b><br>
-            <span style="color:#e74c3c;">■ Критическая >95%</span><br>
+            <span style="color:#e74c3c;">■ Критическая &gt;95%</span><br>
             <span style="color:#f39c12;">■ Высокая 70-95%</span><br>
             <span style="color:#f1c40f;">■ Средняя 30-70%</span><br>
-            <span style="color:#2ecc71;">■ Низкая <30%</span><br><br>
+            <span style="color:#2ecc71;">■ Низкая &lt;30%</span><br><br>
             
             <small>
             • Стрелка → доминирующее направление<br>
@@ -399,5 +386,5 @@ class GraphView:
 
         with open(filename, 'w', encoding='utf-8') as f:
             f.write(html)
-        print(f"✓ Граф с направленными потоками сохранён в {filename}")
+        print(f" Граф с направленными потоками сохранён в {filename}")
 
