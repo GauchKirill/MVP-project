@@ -70,6 +70,7 @@ class ModelTrainer:
             epochs: int = 100,
             batch_size: int = 32,
             early_stopping_patience: int = 30,
+            min_delta: float = 1e-6,
             verbose: bool = True) -> Dict:
         
         train_dataset = TensorDataset(
@@ -93,14 +94,16 @@ class ModelTrainer:
         for epoch in range(epochs):
             self.model.train()
             train_loss, train_components = self._run_epoch(
-                train_loader, train_capacity_masks, training=True
+                train_loader, train_capacity_masks, training=True, 
+                desc=f"Train эпоха {epoch+1}/{epochs}"
             )
             
             if val_loader is not None:
                 self.model.eval()
                 with torch.no_grad():
                     val_loss, val_components = self._run_epoch(
-                        val_loader, val_capacity_masks, training=False
+                        val_loader, val_capacity_masks, training=False,
+                        desc=f"Val эпоха {epoch+1}/{epochs}"
                     )
             else:
                 val_loss = train_loss
@@ -114,7 +117,8 @@ class ModelTrainer:
             if self.scheduler is not None:
                 self.scheduler.step(val_loss)
             
-            if val_loss < best_val_loss:
+            # Улучшение считается, если val_loss уменьшился хотя бы на min_delta
+            if val_loss < best_val_loss - min_delta:
                 best_val_loss = val_loss
                 patience_counter = 0
                 best_model_state = self.model.state_dict().copy()
@@ -123,10 +127,8 @@ class ModelTrainer:
             
             if verbose:
                 self._log_epoch(epoch, train_loss, val_loss, train_components)
-            
+
             if patience_counter >= early_stopping_patience:
-                if verbose:
-                    print(f"\nРанняя остановка на эпохе {epoch}")
                 break
         
         if best_model_state is not None:
@@ -134,8 +136,8 @@ class ModelTrainer:
         
         return self.history
 
-
-    def _run_epoch(self, loader: DataLoader, capacity_masks: np.ndarray, training: bool = True):
+    def _run_epoch(self, loader: DataLoader, capacity_masks: np.ndarray, 
+                   training: bool = True, desc: str = ""):
         total_loss = 0.0
         total_components = {}
         num_batches = 0
@@ -153,9 +155,9 @@ class ModelTrainer:
             batch_capacities = batch_features[:, :self.feature_extractor.E]
             
             # Индексы для маски
-            batch_size = loader.batch_size if loader.batch_size is not None else 1
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, len(capacity_masks))
+            batch_size_actual = batch_features.shape[0]
+            start_idx = batch_idx * loader.batch_size if loader.batch_size else 0
+            end_idx = min(start_idx + batch_size_actual, len(capacity_masks))
             batch_mask = torch.FloatTensor(capacity_masks[start_idx:end_idx]).to(self.device)
             
             if training and self.optimizer:

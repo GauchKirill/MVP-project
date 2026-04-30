@@ -29,17 +29,19 @@ class DataGenerator:
     
     def generate_samples(self, 
                      num_samples: int,
-                     sparsity_levels: List[float] = [0.3, 0.7]) -> Tuple[np.ndarray, np.ndarray, List[Dict]]:
+                     sparsity_levels: List[float] = [0.3, 0.7],
+                     demand_scale_factors: List[float] = [1.0]) -> Tuple[np.ndarray, np.ndarray, List[Dict]]:
         """
         Генерирует сценарии
         
         Args:
-            num_samples: количество сэмплов на каждый уровень разреженности
+            num_samples: количество сэмплов на каждую комбинацию (sparsity, scale_factor)
             sparsity_levels: список долей рёбер, которые станут inf (0.3 = 30% inf)
+            demand_scale_factors: список коэффициентов масштабирования demand-признаков
             
         Returns:
             raw_features: (total_samples, feature_dim) — значения в [0, 1] + inf
-            demands_matrix: (total_samples, S, C) — заявки в [0, 1]
+            demands_matrix: (total_samples, S, C) — заявки, масштабированные коэффициентом
             scenarios: список словарей заявок (для отладки)
         """
         all_features = []
@@ -49,22 +51,27 @@ class DataGenerator:
         C = len(self.consumers)
         
         for sparsity in sparsity_levels:
-            print(f"\nГенерация для sparsity={sparsity:.2f} (доля inf capacity: {sparsity*100:.0f}%)")
-            
-            sampler = qmc.LatinHypercube(d=self.feature_dim)
-            samples = sampler.random(n=num_samples)
-            
-            for i in range(num_samples):
-                row = samples[i].copy()
+            for scale_factor in demand_scale_factors:
+                print(f"\nГенерация для sparsity={sparsity:.2f} (доля inf capacity: {sparsity*100:.0f}%), "
+                      f"demand_scale={scale_factor}")
                 
-                # Заменяем часть capacity на inf согласно уровню разреженности
-                num_inf = int(self.E * sparsity)
-                if num_inf > 0:
-                    inf_indices = np.random.choice(self.E, size=num_inf, replace=False)
-                    row[inf_indices] = float('inf')
+                sampler = qmc.LatinHypercube(d=self.feature_dim)
+                samples = sampler.random(n=num_samples)
                 
-                all_features.append(row)
-                all_scenarios.append(self._row_to_flows(row))
+                for i in range(num_samples):
+                    row = samples[i].copy()
+                    
+                    # Заменяем часть capacity на inf согласно уровню разреженности
+                    num_inf = int(self.E * sparsity)
+                    if num_inf > 0:
+                        inf_indices = np.random.choice(self.E, size=num_inf, replace=False)
+                        row[inf_indices] = float('inf')
+                    
+                    # Масштабируем demand-признаки (последние S*C элементов)
+                    row[self.E:] *= scale_factor
+                    
+                    all_features.append(row)
+                    all_scenarios.append(self._row_to_flows(row))
         
         all_features = np.array(all_features, dtype=np.float32)
         
@@ -78,7 +85,9 @@ class DataGenerator:
                 val = row[offset + idx]
                 demands_matrix[i, s_idx, c_idx] = val
         
-        print(f"\n !Сгенерировано {len(all_scenarios)} сценариев!")
+        total_combinations = len(sparsity_levels) * len(demand_scale_factors)
+        print(f"\n✓ Сгенерировано {len(all_scenarios)} сценариев "
+              f"({total_combinations} комбинаций × {num_samples} сэмплов)")
         print(f"  - Размер матрицы признаков: {all_features.shape}")
         print(f"  - Диапазон demands: [{demands_matrix.min():.4f}, {demands_matrix.max():.4f}]")
         

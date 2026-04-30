@@ -20,6 +20,11 @@ def print_results(results, extractor):
     print(f"Доставлено: {results['total_delivered']:.1f} кВт")
     if results['demanded'] > 0:
         print(f"Процент доставки: {100 * results['total_delivered'] / results['demanded']:.1f}%")
+    
+    # Средняя доля потерь (вес фиктивного пути)
+    if 'loss_weights' in results:
+        mean_loss = results['loss_weights'].mean()
+        print(f"Средняя доля потерь (фиктивный путь): {mean_loss:.3f}")
 
     edge_utils = results['edge_utilization']
     overloaded = np.where(edge_utils > 0.95)[0]
@@ -60,7 +65,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
     )
     raw_features, _, scenarios = generator.generate_samples(
         num_samples=train_cfg.training.num_samples_per_level,
-        sparsity_levels=train_cfg.training.sparsity_levels
+        sparsity_levels=train_cfg.training.sparsity_levels,
+        demand_scale_factors=train_cfg.training.demand_scale_factors
     )
     train_features, capacity_masks = extractor.normalize_features(raw_features)
 
@@ -93,7 +99,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
     edge_calc = EdgeFlowCalculator(registry, extractor)
     loss_fn = PowerFlowLoss(
         capacity_weight=train_cfg.loss.capacity_weight,
-        demand_weight=train_cfg.loss.demand_weight
+        demand_weight=train_cfg.loss.demand_weight,
+        excess_weight=train_cfg.loss.excess_weight
     )
     trainer = ModelTrainer(model, extractor, edge_calc, loss_fn, device)
     trainer.configure_optimizer(lr=train_cfg.training.learning_rate)
@@ -103,7 +110,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
         val_features=vv, val_demands=vd, val_capacity_masks=vm,
         epochs=train_cfg.training.epochs,
         batch_size=train_cfg.training.batch_size,
-        early_stopping_patience=train_cfg.training.early_stopping_patience
+        early_stopping_patience=train_cfg.training.early_stopping_patience,
+        min_delta=train_cfg.get('training.min_delta', 1e-6)
     )
 
     os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
@@ -170,9 +178,8 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Инициализация начальных потоков
-    if run_cfg.use_ml_initial_guess:
-        print("\n Загрузка ML модели для начального приближения\n")
-        
+    if run_cfg.get('use_ml_initial_guess', False):
+        print("\nЗагрузка ML модели для начального приближения")
         checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
         model = PathWeightNetwork(
             input_dim=checkpoint['feature_dim'],
@@ -192,8 +199,10 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         with torch.no_grad():
             weights = model(features_tensor)[0].cpu().numpy()  # (S, C, max_paths)
 
-        # Переносим ML-веса в FlowInstance как начальные потоки
-        initialized_count = 0
+        # Используем только реальные пути (без фиктивного)
+        real_weights = weights[:, :, :extractor.max_paths]
+
+        # Переносим веса в FlowInstance
         for inst in instances:
             s_name = inst.request.source.name
             c_name = inst.request.consumer.name
@@ -203,8 +212,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
             
             s_idx = extractor.source_to_idx[s_name]
             c_idx = extractor.consumer_to_idx[c_name]
-            w = weights[s_idx, c_idx, :]  # веса для всех путей этой пары
-            
+            w = real_weights[s_idx, c_idx, :]
             paths = inst.get_paths()
             inst.path_flows.clear()
             
@@ -214,16 +222,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
                     inst.path_flows[key] = float(w[i]) * inst.target_amount
                 else:
                     inst.path_flows[key] = 0.0
-            
-            initialized_count += 1
-        
-        print(f" ML-приближение установлено для {initialized_count} заявок")
-        
-        # Выводим статистику начального приближения
-        total_ml_flow = sum(inst.get_total_flow() for inst in instances)
-        total_target = sum(inst.target_amount for inst in instances)
-        print(f"  Суммарный поток (ML): {total_ml_flow:.2f} / {total_target:.2f} кВт")
-        print(f"  Точность ML: {total_ml_flow/total_target*100:.1f}%")
+        print("✓ Начальное приближение от ML установлено.")
     else:
         print("!! Используется равномерное начальное распределение !!")
         
@@ -244,6 +243,10 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         max_iter=solver_cfg.max_iter,
         epsilon=solver_cfg.epsilon,
         gradient_epsilon_rel=solver_cfg.gradient_epsilon_rel,
+        capacity_weight=solver_cfg.capacity_weight,
+        demand_weight=solver_cfg.demand_weight,
+        excess_weight=solver_cfg.excess_weight,
+        early_stopping_patience=solver_cfg.early_stopping_patience,
         verbose=solver_cfg.verbose
     )
     solver.set_instances(instances)
