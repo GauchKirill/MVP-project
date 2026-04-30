@@ -32,64 +32,49 @@ class FlowPredictor:
                                 normalized_features: np.ndarray,
                                 flows: Dict[str, Dict[str, float]],
                                 capacity_mask: np.ndarray) -> Dict:
-        """
-        Предсказывает распределение потоков, используя уже нормализованные признаки.
-        
-        Args:
-            normalized_features: (feature_dim,) — нормализованный вектор признаков
-            flows: словарь заявок {source: {consumer: demand}} — в кВт
-            capacity_mask: (E,) — 1.0 для конечных capacity, 0.0 для inf
-            
-        Returns:
-            словарь с результатами:
-                - path_weights: (S, C, max_paths) — веса распределения
-                - path_flows: (S, C, max_paths) — потоки по путям
-                - edge_flows: (E,) — суммарные потоки на рёбрах
-                - edge_utilization: (E,) — загрузка рёбер (0..1)
-                - total_delivered: суммарная доставка
-                - demanded: суммарная заявка
-        """
         features_tensor = torch.from_numpy(normalized_features).unsqueeze(0).float().to(self.device)
         demands = self._create_demand_matrix(flows)
         demands_tensor = torch.from_numpy(demands).unsqueeze(0).float().to(self.device)
         
         with torch.no_grad():
-            # Прямой проход
             path_weights = self.model(features_tensor)[0]  # (S, C, max_paths)
-            path_flows = path_weights * demands_tensor[0].unsqueeze(-1)  # веса * заявки
-            edge_flows = self.edge_calculator.compute_edge_flows(path_flows.unsqueeze(0))[0]  # (E,)
+            # Последний путь — фиктивный, исключаем его из реальных весов
+            real_weights = path_weights[:, :, :self.feature_extractor.max_paths]  # (S, C, max_real_paths)
+            path_flows = real_weights * demands_tensor[0].unsqueeze(-1)
+            edge_flows = self.edge_calculator.compute_edge_flows(path_flows.unsqueeze(0))[0]
         
         # В numpy
-        path_weights_np = path_weights.cpu().numpy()
+        path_weights_np = real_weights.cpu().numpy()
         path_flows_np = path_flows.cpu().numpy()
         edge_flows_np = edge_flows.cpu().numpy()
+        # Веса фиктивного пути (доля потерь)
+        loss_weights_np = path_weights[:, :, -1].cpu().numpy()  # (S, C)
         
-        # Загрузка рёбер — только для конечных capacity
+        # Загрузка рёбер
         edge_capacities = self.feature_extractor.get_edge_capacities()
         edge_utilization = np.zeros_like(edge_flows_np)
         finite_mask = capacity_mask > 0.5
         if finite_mask.any():
-            # Применяем маску: для inf-рёбер загрузка = 0
             edge_utilization[finite_mask] = np.divide(
                 edge_flows_np[finite_mask],
                 edge_capacities[finite_mask],
                 out=np.zeros_like(edge_flows_np[finite_mask]),
-                where=edge_capacities[finite_mask] < 1e8  # на всякий случай
+                where=edge_capacities[finite_mask] < 1e8
             )
         
         # Суммарная доставка
-        demands_np = demands.flatten()
-        delivered_np = path_flows_np.sum(axis=-1).flatten()
-        # Доставка не может превышать заявку (веса в сумме <= 1 после softmax)
-        total_delivered = min(demands_np.sum(), delivered_np.sum())
+        delivered_np = path_flows_np.sum(axis=-1)
+        total_delivered = delivered_np.sum()
+        total_demanded = demands.sum()
         
         return {
             'path_weights': path_weights_np,
             'path_flows': path_flows_np,
             'edge_flows': edge_flows_np,
             'edge_utilization': edge_utilization,
+            'loss_weights': loss_weights_np,
             'total_delivered': total_delivered,
-            'demanded': demands_np.sum()
+            'demanded': total_demanded
         }
     
     def _create_demand_matrix(self, flows: Dict) -> np.ndarray:

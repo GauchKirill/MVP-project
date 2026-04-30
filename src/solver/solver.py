@@ -17,6 +17,7 @@ class Solver:
                  epsilon: float = 1e-6,
                  gradient_epsilon_rel: float = 0.01,
                  capacity_weight: float = 10.0,
+                 demand_weight: float = 1.0,
                  excess_weight: float = 1.0,
                  early_stopping_patience: int = 20,
                  verbose: bool = True):
@@ -26,6 +27,7 @@ class Solver:
         self.epsilon = epsilon
         self.gradient_epsilon_rel = gradient_epsilon_rel
         self.capacity_weight = capacity_weight
+        self.demand_weight = demand_weight
         self.excess_weight = excess_weight
         self.early_stopping_patience = early_stopping_patience
         self.verbose = verbose
@@ -174,20 +176,29 @@ class Solver:
         total_loss = 0.0
         components = {}
 
-        # 1. Недопоставка и превышение доставки по заявкам
+        # 1. Недопоставка (shortage)
         shortage = 0.0
+        for inst_idx, inst in enumerate(self.instances):
+            inst_paths = [inst._path_to_key(p) for p in inst.get_paths()]
+            actual_total = sum(actual_flows.get((inst_idx, pk), 0.0) for pk in inst_paths)
+            target = inst.target_amount
+            if actual_total < target:
+                shortage += target - actual_total
+        total_loss += self.demand_weight * shortage
+        components['shortage'] = shortage
+
+        # 2. Превышение доставки (excess)
         excess = 0.0
         for inst_idx, inst in enumerate(self.instances):
             inst_paths = [inst._path_to_key(p) for p in inst.get_paths()]
             actual_total = sum(actual_flows.get((inst_idx, pk), 0.0) for pk in inst_paths)
             target = inst.target_amount
-            shortage += max(target - actual_total, 0.0)
-            excess += max(actual_total - target, 0.0)
-        total_loss += shortage + self.excess_weight * excess
-        components['shortage'] = shortage
+            if actual_total > target:
+                excess += actual_total - target
+        total_loss += self.excess_weight * excess
         components['excess'] = excess
 
-        # 2. Превышение пропускной способности
+        # 3. Превышение пропускной способности
         edge_flows = {edge: 0.0 for edge in self.graph.edges}
         for (inst_idx, path_key), flow in actual_flows.items():
             inst = self.instances[inst_idx]

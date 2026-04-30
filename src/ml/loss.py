@@ -12,14 +12,17 @@ class PowerFlowLoss(nn.Module):
     
     loss_capacity: штраф за превышение пропускной способности (только для конечных capacity)
     loss_demand: штраф за недопоставку относительно заявок
+    loss_excess: штраф за превышение доставки над заявками
     """
     
     def __init__(self,
                  capacity_weight: float = 1.0,
-                 demand_weight: float = 1.0):
+                 demand_weight: float = 1.0,
+                 excess_weight: float = 1.0):
         super().__init__()
         self.capacity_weight = capacity_weight
         self.demand_weight = demand_weight
+        self.excess_weight = excess_weight
         self.last_losses: Dict[str, float] = {}
     
     def forward(self,
@@ -48,24 +51,27 @@ class PowerFlowLoss(nn.Module):
         
         # 1. Capacity loss — превышение над замаскированной capacity
         capacity_violation = F.relu(edge_flows_masked - edge_capacities_masked)
-        
-
         loss_capacity = self.capacity_weight * capacity_violation.mean()
-        
         total_loss = total_loss + loss_capacity
         components['capacity'] = loss_capacity.item()
         
-        # 2. Demand loss
+        # 2. Demand loss — недопоставка
         delivered = path_flows.sum(dim=-1)
-        shortage = torch.abs(demands - delivered)
+        shortage = F.relu(demands - delivered)  # только положительная недопоставка
         loss_demand = self.demand_weight * shortage.mean()
         total_loss = total_loss + loss_demand
         components['demand'] = loss_demand.item()
         
+        # 3. Excess loss — превышение доставки над заявкой
+        excess = F.relu(delivered - demands)
+        loss_excess = self.excess_weight * excess.mean()
+        total_loss = total_loss + loss_excess
+        components['excess'] = loss_excess.item()
+        
         # Метрики
         with torch.no_grad():
             if capacity_mask is not None and capacity_mask.sum() > 0:
-                edge_utils = edge_flows_masked / (edge_capacities_masked + 1e-8)
+                edge_utils = edge_flows_masked / (edge_capacities_masked + 1e-12)
                 edge_utils = edge_utils[capacity_mask > 0.5]
                 if edge_utils.numel() > 0:
                     components['avg_util'] = edge_utils.mean().item()
@@ -79,6 +85,11 @@ class PowerFlowLoss(nn.Module):
                 components['avg_util'] = 0.0
                 components['max_util'] = 0.0
                 components['overloaded'] = 0
+            
+            # Добавляем метрику доставки
+            total_delivered = delivered.sum().item()
+            total_demanded = demands.sum().item()
+            components['delivery_ratio'] = total_delivered / (total_demanded + 1e-12)
         
         self.last_losses = components
         return total_loss, components

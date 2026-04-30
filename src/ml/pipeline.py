@@ -16,6 +16,11 @@ def print_results(results, extractor):
     print(f"Доставлено: {results['total_delivered']:.1f} кВт")
     if results['demanded'] > 0:
         print(f"Процент доставки: {100 * results['total_delivered'] / results['demanded']:.1f}%")
+    
+    # Средняя доля потерь (вес фиктивного пути)
+    if 'loss_weights' in results:
+        mean_loss = results['loss_weights'].mean()
+        print(f"Средняя доля потерь (фиктивный путь): {mean_loss:.3f}")
 
     edge_utils = results['edge_utilization']
     overloaded = np.where(edge_utils > 0.95)[0]
@@ -90,7 +95,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
     edge_calc = EdgeFlowCalculator(registry, extractor)
     loss_fn = PowerFlowLoss(
         capacity_weight=train_cfg.loss.capacity_weight,
-        demand_weight=train_cfg.loss.demand_weight
+        demand_weight=train_cfg.loss.demand_weight,
+        excess_weight=train_cfg.loss.excess_weight
     )
     trainer = ModelTrainer(model, extractor, edge_calc, loss_fn, device)
     trainer.configure_optimizer(lr=train_cfg.training.learning_rate)
@@ -186,6 +192,9 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         with torch.no_grad():
             weights = model(features_tensor)[0].cpu().numpy()  # (S, C, max_paths)
 
+        # Используем только реальные пути (без фиктивного)
+        real_weights = weights[:, :, :extractor.max_paths]
+
         # Переносим веса в FlowInstance
         for inst in instances:
             s_name = inst.request.source.name
@@ -194,12 +203,15 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
                 continue
             s_idx = extractor.source_to_idx[s_name]
             c_idx = extractor.consumer_to_idx[c_name]
-            w = weights[s_idx, c_idx, :]
+            w = real_weights[s_idx, c_idx, :]
             paths = inst.get_paths()
             inst.path_flows.clear()
             for i, path in enumerate(paths):
                 key = inst._path_to_key(path)
-                inst.path_flows[key] = w[i] * inst.target_amount
+                if i < len(w):
+                    inst.path_flows[key] = float(w[i]) * inst.target_amount
+                else:
+                    inst.path_flows[key] = 0.0
         print("✓ Начальное приближение от ML установлено.")
     else:
         for inst in instances:
@@ -215,6 +227,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         epsilon=solver_cfg.epsilon,
         gradient_epsilon_rel=solver_cfg.gradient_epsilon_rel,
         capacity_weight=solver_cfg.capacity_weight,
+        demand_weight=solver_cfg.demand_weight,
         excess_weight=solver_cfg.excess_weight,
         early_stopping_patience=solver_cfg.early_stopping_patience,
         verbose=solver_cfg.verbose
