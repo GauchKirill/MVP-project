@@ -125,19 +125,10 @@ class ModelTrainer:
             else:
                 patience_counter += 1
             
-            # Обновляем описание главного прогресс-бара
-            epoch_pbar.set_postfix({
-                'train_loss': f'{train_loss:.4e}',
-                'val_loss': f'{val_loss:.4e}',
-                'best_val': f'{best_val_loss:.4e}',
-                'patience': f'{patience_counter}/{early_stopping_patience}'
-            })
-            
+            if verbose:
+                self._log_epoch(epoch, train_loss, val_loss, train_components)
+
             if patience_counter >= early_stopping_patience:
-                # if verbose:
-                #     print(f"\nРанняя остановка на эпохе {epoch}: "
-                #           f"val_loss не улучшался {early_stopping_patience} эпох "
-                #           f"(лучший val_loss = {best_val_loss:.6e})")
                 break
         
         if best_model_state is not None:
