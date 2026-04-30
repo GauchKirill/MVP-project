@@ -1,8 +1,8 @@
 {
   "training": {
-    "num_samples_per_level": 200,
-    "sparsity_levels": [0.15, 0.30],
-    "demand_scale_factors": [1.0],
+    "num_samples_per_level": 300,
+    "sparsity_levels": [0.3, 0.7],
+    "demand_scale_factors": [0.001],
     "batch_size": 32,
     "epochs": 30,
     "learning_rate": 1e-3,
@@ -14,12 +14,12 @@
     "dropout_rate": 0.3
   },
   "loss": {
-    "demand_weight": 1.0,
+    "demand_weight": 30.0,
     "excess_weight": 1.5,
     "capacity_weight": 1.8
   },
   "solver": {
-    "learning_rate": 0.9,
+    "learning_rate": 0.3,
     "max_iter": 5000,
     "epsilon": 1e-6,
     "gradient_epsilon_rel": 0.01,

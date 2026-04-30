@@ -190,7 +190,7 @@ class ModelTrainer:
                 'loss': f'{loss.item():.4e}',
                 'cap': f'{components.get("capacity", 0):.4e}',
                 'dem': f'{components.get("demand", 0):.4e}',
-                'avg_u': f'{components.get("avg_util", 0):.3f}',
+                'excess': f'{components.get("excess",0):.4e}',
                 'over': f'{components.get("overloaded", 0):.0f}'
             })
         
@@ -204,7 +204,6 @@ class ModelTrainer:
             f"Val: {val_loss:.4e} | "
             f"cap: {components.get('capacity', 0):.4e} | "
             f"dem: {components.get('demand', 0):.4e} | "
-            f"avg_u: {components.get('avg_util', 0):.4e} | "
-            f"max_u: {components.get('max_util', 0):.4e} | "
+            f"excess: {components.get('excess', 0):.4e} | "
             f"over: {components.get('overloaded', 0):.0f}"
         )

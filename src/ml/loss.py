@@ -65,28 +65,16 @@ class PowerFlowLoss(nn.Module):
         total_loss = total_loss + loss_excess
         components['excess'] = loss_excess.item()
         
-        # 3. Excess loss — превышение доставки над заявкой
-        excess = F.relu(delivered - demands)
-        loss_excess = self.excess_weight * excess.mean()
-        total_loss = total_loss + loss_excess
-        components['excess'] = loss_excess.item()
-        
         # метрики
         with torch.no_grad():
             if capacity_mask is not None and capacity_mask.sum() > 0:
                 edge_utils = edge_flows_masked / (edge_capacities_masked + 1e-12)
                 edge_utils = edge_utils[capacity_mask > 0.5]
                 if edge_utils.numel() > 0:
-                    components['avg_util'] = edge_utils.mean().item()
-                    components['max_util'] = edge_utils.max().item()
                     components['overloaded'] = (edge_utils > 1.0).sum().item()
                 else:
-                    components['avg_util'] = 0.0
-                    components['max_util'] = 0.0
                     components['overloaded'] = 0
             else:
-                components['avg_util'] = 0.0
-                components['max_util'] = 0.0
                 components['overloaded'] = 0
             
             # Добавляем метрику доставки
