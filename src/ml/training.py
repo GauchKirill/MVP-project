@@ -1,5 +1,3 @@
-"""Обучение нейросетевой модели."""
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -15,7 +13,7 @@ from .feature_extractor import FeatureExtractor
 
 class ModelTrainer:
     """
-    Класс для обучения модели распределения потоков.
+    Класс для обучения модели распределения потоков
     """
     
     def __init__(self,
@@ -47,7 +45,7 @@ class ModelTrainer:
                             weight_decay: float = 1e-5,
                             scheduler_patience: int = 20):
         """
-        Настраивает оптимизатор и планировщик.
+        Настраивает оптимизатор и планировщик
         """
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
@@ -93,10 +91,7 @@ class ModelTrainer:
         patience_counter = 0
         best_model_state = None
         
-        # Главный прогресс-бар по эпохам
-        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха")
-        
-        for epoch in epoch_pbar:
+        for epoch in range(epochs):
             self.model.train()
             train_loss, train_components = self._run_epoch(
                 train_loader, train_capacity_masks, training=True, 
@@ -156,10 +151,12 @@ class ModelTrainer:
         total_components = {}
         num_batches = 0
         
-        # Вложенный прогресс-бар по батчам
-        batch_pbar = tqdm(loader, desc=desc, unit="батч", leave=False)
+        # Оборачиваем loader в tqdm для отображения прогресса батчей
+        # desc меняется в зависимости от режима (train/val)
+        desc = "Training" if training else "Validation"
+        progress_bar = tqdm(loader, desc=desc, leave=False, unit="batch")
         
-        for batch_idx, (batch_features, batch_demands) in enumerate(batch_pbar):
+        for batch_idx, (batch_features, batch_demands) in enumerate(progress_bar):
             batch_features = batch_features.to(self.device)
             batch_demands = batch_demands.to(self.device)
             
@@ -197,13 +194,26 @@ class ModelTrainer:
                 total_components[key] = total_components.get(key, 0.0) + value
             num_batches += 1
             
-            # Обновляем описание батч-прогресс-бара
-            batch_pbar.set_postfix({
+            # Обновляем описание прогресс-бара текущими метриками
+            progress_bar.set_postfix({
                 'loss': f'{loss.item():.4e}',
                 'cap': f'{components.get("capacity", 0):.4e}',
                 'dem': f'{components.get("demand", 0):.4e}',
-                'del_ratio': f'{components.get("delivery_ratio", 0):.3f}',
+                'avg_u': f'{components.get("avg_util", 0):.3f}',
                 'over': f'{components.get("overloaded", 0):.0f}'
             })
         
         return total_loss / num_batches, {k: v / num_batches for k, v in total_components.items()}
+
+    def _log_epoch(self, epoch: int, train_loss: float, val_loss: float,
+                components: Dict[str, float]):
+        print(
+            f"Epoch {epoch:3d} | "
+            f"Train: {train_loss:.4e} | "
+            f"Val: {val_loss:.4e} | "
+            f"cap: {components.get('capacity', 0):.4e} | "
+            f"dem: {components.get('demand', 0):.4e} | "
+            f"avg_u: {components.get('avg_util', 0):.4e} | "
+            f"max_u: {components.get('max_util', 0):.4e} | "
+            f"over: {components.get('overloaded', 0):.0f}"
+        )

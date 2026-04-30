@@ -1,18 +1,15 @@
-"""Модуль для поиска всех простых путей между вершинами графа."""
-
 from typing import List, Set
 from .model import Graph, Node, Edge
 
 
 class PathFinder:
-    """Класс для поиска путей в графе."""
-    
+    """Класс для поиска путей в графе"""
     def __init__(self, graph: Graph):
         self.graph = graph
     
     def find_all_simple_paths(self, source: Node, target: Node) -> List[List[Edge]]:
         """
-        Находит все простые пути (без циклов) от source до target.
+        находит все простые пути (без циклов) от source до target
         """
         paths = []
         visited_nodes: Set[str] = set()
@@ -29,7 +26,7 @@ class PathFinder:
                    current_path: List[Edge], 
                    all_paths: List[List[Edge]]):
         """
-        Рекурсивный поиск путей с помощью DFS.
+        реализовал рекурсивный поиск путей с помощью DFS
         """
         
         if current_node == target:
@@ -55,7 +52,7 @@ class PathFinder:
                                            target: Node, 
                                            min_capacity: float) -> List[List[Edge]]:
         """
-        Находит пути, где каждое ребро имеет пропускную способность >= min_capacity.
+        находит пути, где каждое ребро имеет пропускную способность >= min_capacity
         """
         all_paths = self.find_all_simple_paths(source, target)
         
@@ -68,7 +65,7 @@ class PathFinder:
     
     def get_path_capacity(self, path: List[Edge]) -> float:
         """
-        Возвращает пропускную способность пути (минимум по всем рёбрам).
+        возвращает пропускную способность пути (минимум по всем рёбрам)
         """
         if not path:
             return 0.0
@@ -76,6 +73,6 @@ class PathFinder:
     
     def get_path_length(self, path: List[Edge]) -> int:
         """
-        Возвращает длину пути в количестве рёбер.
+        возвращает длину пути в количестве рёбер
         """
         return len(path)

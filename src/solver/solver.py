@@ -1,11 +1,9 @@
-"""Решатель задачи распределения потоков с помощью градиентного спуска."""
-
 import copy
-import itertools
 from typing import List, Dict, Tuple
 from graph import Edge, Graph
-from .flow_instance import FlowInstance
+import matplotlib.pyplot as plt
 
+from .flow_instance import FlowInstance
 
 class Solver:
     """Решает задачу максимизации доставки энергии с учётом пропускных способностей."""
@@ -39,10 +37,12 @@ class Solver:
         self._edge_to_flows: Dict[Edge, List[Tuple[int, tuple]]] = {}
 
     def set_instances(self, instances: List[FlowInstance]):
+        """Устанавливает список экземпляров потоков"""
         self.instances = instances
         self._build_edge_index()
 
     def _build_edge_index(self):
+        """Строит индекс для быстрого определения потоков через каждое ребро"""
         self._edge_to_flows.clear()
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
@@ -53,9 +53,19 @@ class Solver:
                     self._edge_to_flows[edge].append((inst_idx, path_key))
 
     def initialize_uniform(self):
+        """Инициализирует равномерное распределение целевого потока по путям"""
         for inst in self.instances:
             inst.set_uniform_flow()
-
+    
+    def compute_edge_total_flow(self, edge: Edge) -> float:
+        """Вычисляет суммарный поток через данное ребро"""
+        total = 0.0
+        if edge in self._edge_to_flows:
+            for inst_idx, path_key in self._edge_to_flows[edge]:
+                inst = self.instances[inst_idx]
+                total += inst.path_flows.get(path_key, 0.0)
+        return total
+    
     def compute_actual_flows(self, desired_flows: Dict[Tuple[int, tuple], float]) -> Dict[Tuple[int, tuple], float]:
         """
         Вычисляет реальные потоки после последовательного применения ограничений:
@@ -324,6 +334,7 @@ class Solver:
                     inst.path_flows[key] *= scale
 
     def optimize(self) -> Dict:
+        """Выполняет градиентный спуск"""
         if not self.instances:
             return {'success': False, 'message': 'Нет экземпляров потоков'}
 
@@ -426,7 +437,13 @@ class Solver:
         }
 
     def get_edge_loads(self) -> Dict[Edge, Tuple[float, float]]:
-        """Фактические потоки и загрузка для визуализации."""
+        """
+        Возвращает словарь с фактическим потоком и загрузкой каждого ребра
+        Returns: {edge: (flow, load_ratio)}
+        """
+        loads = {}
+        
+        # Получаем фактические потоки
         desired_flows = {}
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
@@ -490,8 +507,44 @@ class Solver:
             'total_excess': max(total_delivered - total_requested, 0.0),
             'delivery_ratio': total_delivered / total_requested if total_requested > 0 else 0.0
         }
-
+    
+    def get_desired_directed_flows(self) -> Dict[Tuple[str, str], float]:
+        """
+        Возвращает желаемые направленные потоки (до применения ограничений)
+        Показывает, как солвер хочет распределить потоки
+        """
+        directed = {}
+        
+        for inst in self.instances:
+            for path in inst.get_paths():
+                path_key = inst._path_to_key(path)
+                flow = inst.path_flows.get(path_key, 0.0)
+                
+                if flow <= 0.001:
+                    continue
+                
+                # Восстанавливаем маршрут
+                current_node = inst.request.source
+                
+                for edge in path:
+                    # Определяем следующий узел
+                    if edge.nodes[0] == current_node:
+                        next_node = edge.nodes[1]
+                    else:
+                        next_node = edge.nodes[0]
+                    
+                    from_name = current_node.name
+                    to_name = next_node.name
+                    
+                    key = (from_name, to_name)
+                    directed[key] = directed.get(key, 0.0) + flow
+                    
+                    current_node = next_node
+        
+        return directed
+    
     def get_edge_violations(self) -> List[Dict]:
+        """Возвращает список рёбер с превышением пропускной способности."""
         loads = self.get_edge_loads()
         violations = []
         for edge, (flow, ratio) in loads.items():
@@ -506,8 +559,7 @@ class Solver:
         return violations
 
     def plot_training_history(self, filename="training_history.png"):
-        # без изменений (оставлен оригинальный код)
-        import matplotlib.pyplot as plt
+        """Строит графики процесса обучения"""
         if not self.loss_history:
             print("Нет истории обучения")
             return
@@ -547,3 +599,43 @@ class Solver:
         plt.savefig(filename, dpi=150)
         plt.show()
         print(f"Графики обучения сохранены в {filename}")
+
+    def get_directed_edge_flows(self) -> Dict[Tuple[str, str], float]:
+        """
+        Возвращает направленные фактические потоки по рёбрам.
+        
+        Returns:
+            {(from_node, to_node): flow} — фактические потоки после ограничений
+        """
+        # Получаем текущие оптимизируемые потоки
+        current_flows = {}
+        for inst_idx, inst in enumerate(self.instances):
+            for path in inst.get_paths():
+                path_key = inst._path_to_key(path)
+                current_flows[(inst_idx, path_key)] = inst.path_flows[path_key]
+        
+        # Применяем ограничения — получаем фактические потоки
+        actual_flows = self.compute_actual_flows(current_flows)
+        
+        # Суммируем направленные потоки
+        directed = {}
+        for (inst_idx, path_key), flow in actual_flows.items():
+            if flow <= 0:
+                continue
+            
+            inst = self.instances[inst_idx]
+            for path in inst.get_paths():
+                if inst._path_to_key(path) == path_key:
+                    current_node = inst.request.source
+                    for edge in path:
+                        if edge.nodes[0] == current_node:
+                            next_node = edge.nodes[1]
+                        else:
+                            next_node = edge.nodes[0]
+                        
+                        key = (current_node.name, next_node.name)
+                        directed[key] = directed.get(key, 0.0) + flow
+                        current_node = next_node
+                    break
+        
+        return directed

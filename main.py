@@ -1,3 +1,4 @@
+import os
 import json
 from src.config_parser import ConfigParser
 from src.graph import Graph, RequestRegistry
@@ -16,6 +17,8 @@ def main():
     run_cfg = ConfigParser('settings/run_config.json')
     train_cfg = ConfigParser('settings/config.json')
 
+    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
+
     graph = Graph()
     load_edges(graph, f"settings/{run_cfg.edges_file}")
     registry = RequestRegistry(graph)
@@ -23,11 +26,11 @@ def main():
     registry.build_all_paths()
 
     mode = run_cfg.mode
-    if mode == 'train':
+    if mode == 'train':  # режим обучения на сгенерированных данных
         run_training(graph, registry, run_cfg, train_cfg)
-    elif mode == 'predict':
+    elif mode == 'predict':  # режим предсказания без переобучения (хорошее приближение для тестирования на новых данныз)
         run_prediction(graph, registry, run_cfg, train_cfg)
-    elif mode == 'solve':
+    elif mode == 'solve':  # режим точного решения (советуем выполнять после приближенного предсказания от ml решателя)
         run_solver_pipeline(graph, registry, run_cfg, train_cfg)
     else:
         raise ValueError(f"Неизвестный режим: {mode}")
