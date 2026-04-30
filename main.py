@@ -1,3 +1,4 @@
+import os
 import json
 from src.config_parser import ConfigParser
 from src.graph import Graph, RequestRegistry
@@ -15,6 +16,8 @@ def load_edges(graph, filename):
 def main():
     run_cfg = ConfigParser('settings/run_config.json')
     train_cfg = ConfigParser('settings/config.json')
+
+    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
 
     graph = Graph()
     load_edges(graph, f"settings/{run_cfg.edges_file}")

@@ -339,14 +339,12 @@ class GraphView:
             # Подсказка при наведении
             title = (
                 f"Ребро: {u} ↔ {v}\n"
-                f"Направление: {direction}\n"
-                f"Чистый поток: {net_flow:.2f} кВт\n"
                 f"────────────────\n"
                 f"Поток {u} → {v}: {flow_uv:.2f} кВт\n"
                 f"Поток {v} → {u}: {flow_vu:.2f} кВт\n"
                 f"────────────────\n"
-                f"Суммарный поток: {total_flow:.2f} кВт\n"
-                f"Максимум: {cap_str} кВт\n"
+                f"Суммарный поток по ребру: {total_flow:.2f} кВт\n"
+                f"Максимальная вместимость: {cap_str} кВт\n"
                 f"Загрузка: {ratio*100:.1f}%"
             )
             
@@ -356,12 +354,12 @@ class GraphView:
                 if flow_uv >= flow_vu:
                     net.add_edge(u, v, title=title, color=color, width=width, arrows='to')
                     # Обратное направление (тонкая линия)
-                    back_width = max(1, (flow_vu / max(flow_uv, 1)) * width)
-                    net.add_edge(v, u, title=title, color='#95a5a6', width=back_width, arrows='to')
+                    # back_width = max(1, (flow_vu / max(flow_uv, 1)) * width)
+                    # net.add_edge(v, u, title=title, color='#95a5a6', width=back_width, arrows='to')
                 else:
                     net.add_edge(v, u, title=title, color=color, width=width, arrows='to')
-                    back_width = max(1, (flow_uv / max(flow_vu, 1)) * width)
-                    net.add_edge(u, v, title=title, color='#95a5a6', width=back_width, arrows='to')
+                    # back_width = max(1, (flow_uv / max(flow_vu, 1)) * width)
+                    # net.add_edge(u, v, title=title, color='#95a5a6', width=back_width, arrows='to')
             else:
                 # Поток только в одну сторону
                 if flow_uv > 0:
@@ -390,13 +388,11 @@ class GraphView:
             <span style="color:#e74c3c;">■ Критическая &gt;95%</span><br>
             <span style="color:#f39c12;">■ Высокая 70-95%</span><br>
             <span style="color:#f1c40f;">■ Средняя 30-70%</span><br>
-            <span style="color:#2ecc71;">■ Низкая &lt;30%</span><br>
-            <span style="color:#95a5a6;">■ Обратный поток</span><br><br>
+            <span style="color:#2ecc71;">■ Низкая &lt;30%</span><br><br>
             
             <small>
             • Стрелка → направление потока<br>
             • Толщина линии ∝ величине потока<br>
-            • Серый цвет — обратное направление<br>
             • При наведении — детали потоков
             </small>
         </div>

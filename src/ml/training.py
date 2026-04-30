@@ -90,7 +90,7 @@ class ModelTrainer:
         patience_counter = 0
         best_model_state = None
         
-        for epoch in tqdm(range(epochs)):
+        for epoch in range(epochs):
             self.model.train()
             train_loss, train_components = self._run_epoch(
                 train_loader, train_capacity_masks, training=True
@@ -140,7 +140,12 @@ class ModelTrainer:
         total_components = {}
         num_batches = 0
         
-        for batch_idx, (batch_features, batch_demands) in enumerate(loader):
+        # Оборачиваем loader в tqdm для отображения прогресса батчей
+        # desc меняется в зависимости от режима (train/val)
+        desc = "Training" if training else "Validation"
+        progress_bar = tqdm(loader, desc=desc, leave=False, unit="batch")
+        
+        for batch_idx, (batch_features, batch_demands) in enumerate(progress_bar):
             batch_features = batch_features.to(self.device)
             batch_demands = batch_demands.to(self.device)
             
@@ -177,9 +182,17 @@ class ModelTrainer:
             for key, value in components.items():
                 total_components[key] = total_components.get(key, 0.0) + value
             num_batches += 1
+            
+            # Обновляем описание прогресс-бара текущими метриками
+            progress_bar.set_postfix({
+                'loss': f'{loss.item():.4e}',
+                'cap': f'{components.get("capacity", 0):.4e}',
+                'dem': f'{components.get("demand", 0):.4e}',
+                'avg_u': f'{components.get("avg_util", 0):.3f}',
+                'over': f'{components.get("overloaded", 0):.0f}'
+            })
         
         return total_loss / num_batches, {k: v / num_batches for k, v in total_components.items()}
-
 
     def _log_epoch(self, epoch: int, train_loss: float, val_loss: float,
                 components: Dict[str, float]):

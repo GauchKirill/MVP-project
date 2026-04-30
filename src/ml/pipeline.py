@@ -1,3 +1,4 @@
+import os
 import torch
 import json
 import numpy as np
@@ -104,6 +105,8 @@ def run_training(graph, registry, run_cfg, train_cfg):
         batch_size=train_cfg.training.batch_size,
         early_stopping_patience=train_cfg.training.early_stopping_patience
     )
+
+    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
 
     # Сохранение модели
     torch.save({
@@ -292,8 +295,10 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         print("Сравнение с ML-приближением:")
         print(f"  Улучшение недопоставки: {result['total_shortage']:.2f} кВт (солвер уточнил)")
 
+    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
     # Визуализация
     if run_cfg.visualize_flows:
+        os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
         print("Визуализация решения:")
         view = GraphView(graph)
         edge_loads = solver.get_edge_loads()
