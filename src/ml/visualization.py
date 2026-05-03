@@ -481,10 +481,10 @@ class FlowVisualizer:
             report['edges'].append({
                 'from': edge.nodes[0].name,
                 'to': edge.nodes[1].name,
-                'capacity': float('inf') if cap >= 1e8 else float(cap),
+                'capacity': 'inf' if cap == float('inf') else float(cap),
                 'flow': float(edge_flows[i]),
                 'utilization': float(edge_utils[i]),
-                'is_overloaded': bool(edge_utils[i] > 0.95)
+                'is_overloaded': bool(edge_utils[i] > 1.0)
             })
         
         # Информация о заявках

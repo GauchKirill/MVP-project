@@ -15,8 +15,6 @@ class Solver:
                  epsilon: float = 1e-6,
                  gradient_epsilon_rel: float = 0.01,
                  capacity_weight: float = 10.0,
-                 demand_weight: float = 1.0,
-                 excess_weight: float = 1.0,
                  early_stopping_patience: int = 20,
                  verbose: bool = True):
         self.graph = graph
@@ -25,8 +23,6 @@ class Solver:
         self.epsilon = epsilon
         self.gradient_epsilon_rel = gradient_epsilon_rel
         self.capacity_weight = capacity_weight
-        self.demand_weight = demand_weight
-        self.excess_weight = excess_weight
         self.early_stopping_patience = early_stopping_patience
         self.verbose = verbose
 
@@ -173,8 +169,7 @@ class Solver:
         return actual
 
     def compute_loss(self) -> Tuple[float, Dict[str, float]]:
-        """Составной лосс: недопоставка + превышение спроса + превышение capacity."""
-        # Получаем желаемые потоки (текущие значения)
+        """Лосс: недопоставка + превышение capacity."""
         desired_flows = {}
         for inst_idx, inst in enumerate(self.instances):
             for path in inst.get_paths():
@@ -186,7 +181,7 @@ class Solver:
         total_loss = 0.0
         components = {}
 
-        # 1. Недопоставка (shortage)
+        # 1. Недопоставка
         shortage = 0.0
         for inst_idx, inst in enumerate(self.instances):
             inst_paths = [inst._path_to_key(p) for p in inst.get_paths()]
@@ -194,21 +189,10 @@ class Solver:
             target = inst.target_amount
             if actual_total < target:
                 shortage += target - actual_total
-        total_loss += self.demand_weight * shortage
+        total_loss += shortage
         components['shortage'] = shortage
 
-        # 2. Превышение доставки (excess)
-        excess = 0.0
-        for inst_idx, inst in enumerate(self.instances):
-            inst_paths = [inst._path_to_key(p) for p in inst.get_paths()]
-            actual_total = sum(actual_flows.get((inst_idx, pk), 0.0) for pk in inst_paths)
-            target = inst.target_amount
-            if actual_total > target:
-                excess += actual_total - target
-        total_loss += self.excess_weight * excess
-        components['excess'] = excess
-
-        # 3. Превышение пропускной способности
+        # 2. Превышение capacity
         edge_flows = {edge: 0.0 for edge in self.graph.edges}
         for (inst_idx, path_key), flow in actual_flows.items():
             inst = self.instances[inst_idx]
@@ -341,7 +325,7 @@ class Solver:
         self.loss_history = []
         
         loss = 0.0
-        components = {'shortage': 0.0, 'excess': 0.0, 'capacity_violation': 0.0, 'total_loss': 0.0}
+        components = {'shortage': 0.0, 'capacity_violation': 0.0, 'total_loss': 0.0}
 
         # Для ранней остановки: отслеживаем лучшее состояние
         best_loss = float('inf')
@@ -364,7 +348,6 @@ class Solver:
             if self.verbose and iteration % 5 == 0:
                 print(f"Итерация {iteration:4d}: loss = {loss:.2f} "
                       f"(shortage={components['shortage']:.2f}, "
-                      f"excess={components['excess']:.2f}, "
                       f"cap_viol={components['capacity_violation']:.2f})")
 
             # Проверка сходимости
@@ -559,46 +542,27 @@ class Solver:
         return violations
 
     def plot_training_history(self, filename="training_history.png"):
-        """Строит графики процесса обучения"""
+        """Строит график обучения: только train loss в логарифмическом масштабе"""
         if not self.loss_history:
             print("Нет истории обучения")
             return
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        ax1 = axes[0, 0]
-        ax1.plot(self.loss_history, 'b-', linewidth=1)
-        ax1.set_xlabel('Итерация')
-        ax1.set_ylabel('Loss (кВт)')
-        ax1.set_title('Функция потерь')
-        ax1.grid(True, alpha=0.3)
-        ax2 = axes[0, 1]
-        ax2.semilogy(self.loss_history, 'r-', linewidth=1)
-        ax2.set_xlabel('Итерация')
-        ax2.set_ylabel('Loss (кВт, log scale)')
-        ax2.set_title('Логарифмический масштаб')
-        ax2.grid(True, alpha=0.3)
-        ax3 = axes[1, 0]
-        if len(self.loss_history) > 1:
-            loss_diff = [abs(self.loss_history[i] - self.loss_history[i-1]) for i in range(1, len(self.loss_history))]
-            ax3.plot(loss_diff, 'g-', linewidth=0.5)
-            ax3.set_xlabel('Итерация')
-            ax3.set_ylabel('|ΔLoss| (кВт)')
-            ax3.set_title('Изменение функции потерь')
-            ax3.grid(True, alpha=0.3)
-            ax3.axhline(y=self.epsilon, color='r', linestyle='--', label=f'ε = {self.epsilon}')
-            ax3.legend()
-        ax4 = axes[1, 1]
-        if len(self.loss_history) > 1 and self.loss_history[0] > 0:
-            relative_change = [abs(self.loss_history[i] - self.loss_history[i-1]) / self.loss_history[i-1]
-                               for i in range(1, len(self.loss_history))]
-            ax4.semilogy(relative_change, 'm-', linewidth=0.5)
-            ax4.set_xlabel('Итерация')
-            ax4.set_ylabel('|ΔLoss| / Loss')
-            ax4.set_title('Относительное изменение')
-            ax4.grid(True, alpha=0.3)
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # Train loss в логарифмическом масштабе
+        iterations = range(len(self.loss_history))
+        ax.semilogy(iterations, self.loss_history, 'b-', linewidth=1.5, label='Train Loss')
+        
+        ax.set_xlabel('Итерация')
+        ax.set_ylabel('Loss (кВт, log scale)')
+        ax.set_title('Функция потерь (логарифмический масштаб)')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
         plt.tight_layout()
         plt.savefig(filename, dpi=150)
-        plt.show()
-        print(f"Графики обучения сохранены в {filename}")
+        plt.close()
+        print(f"График обучения сохранён в {filename}")
 
     def get_directed_edge_flows(self) -> Dict[Tuple[str, str], float]:
         """

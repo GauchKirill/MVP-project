@@ -1,10 +1,10 @@
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
 from tqdm import tqdm
-import time
+import os
+import matplotlib.pyplot as plt
 
 from .model import PathWeightNetwork
 from .loss import PowerFlowLoss, EdgeFlowCalculator
@@ -190,7 +190,6 @@ class ModelTrainer:
                 'loss': f'{loss.item():.4e}',
                 'cap': f'{components.get("capacity", 0):.4e}',
                 'dem': f'{components.get("demand", 0):.4e}',
-                'excess': f'{components.get("excess",0):.4e}',
                 'over': f'{components.get("overloaded", 0):.0f}'
             })
         
@@ -204,6 +203,76 @@ class ModelTrainer:
             f"Val: {val_loss:.4e} | "
             f"cap: {components.get('capacity', 0):.4e} | "
             f"dem: {components.get('demand', 0):.4e} | "
-            f"excess: {components.get('excess', 0):.4e} | "
             f"over: {components.get('overloaded', 0):.0f}"
         )
+
+    def plot_loss_components(self, filename="loss_components.png"):
+        """Отдельный график с компонентами train_loss"""
+        if not self.history['train_components']:
+            print("Нет данных для визуализации")
+            return
+        
+        # Собираем только capacity и demand
+        components = {}
+        for comp_dict in self.history['train_components']:
+            for key, value in comp_dict.items():
+                if key in ['capacity', 'demand']:  # только эти два
+                    if key not in components:
+                        components[key] = []
+                    components[key].append(value)
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        epochs = range(len(self.history['train_loss']))
+        colors = {'capacity': '#e74c3c', 'demand': '#3498db'}
+        
+        for key, values in components.items():
+            ax.plot(epochs, values, label=key, linewidth=1.5, color=colors.get(key, '#2ecc71'))
+        
+        ax.set_xlabel('Эпоха')
+        ax.set_ylabel('Значение компонента')
+        ax.set_title('Компоненты функции потерь (Train)')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        save_dir = os.path.dirname(filename) if os.path.dirname(filename) else '.'
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(filename, dpi=150)
+        plt.close()  # не показывать, только сохранить
+        print(f"График компонент сохранён в {filename}")
+
+    def plot_loss_curves(self, filename="loss_curves.png"):
+        """График train_loss и val_loss в логарифмическом масштабе"""
+        if not self.history['train_loss']:
+            print("Нет данных для визуализации")
+            return
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        epochs = range(len(self.history['train_loss']))
+        
+        ax.semilogy(epochs, self.history['train_loss'], 'b-', linewidth=1.5, label='Train Loss')
+        if self.history['val_loss']:
+            ax.semilogy(epochs, self.history['val_loss'], 'r-', linewidth=1.5, label='Validation Loss')
+            
+            # Отмечаем минимум валидационного лосса
+            min_val_epoch = np.argmin(self.history['val_loss'])
+            min_val_loss = self.history['val_loss'][min_val_epoch]
+            ax.plot(min_val_epoch, min_val_loss, 'r*', markersize=10, 
+                   label=f'Мин. val: {min_val_loss:.4e}')
+        
+        ax.set_xlabel('Эпоха')
+        ax.set_ylabel('Loss (log scale)')
+        ax.set_title('Функция потерь (логарифмический масштаб)')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        
+        save_dir = os.path.dirname(filename) if os.path.dirname(filename) else '.'
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(filename, dpi=150)
+        plt.close()  # не показывать, только сохранить
+        print(f"График кривых обучения сохранён в {filename}")
