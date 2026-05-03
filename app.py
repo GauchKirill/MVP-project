@@ -1,8 +1,3 @@
-"""
-Веб-интерфейс для системы оптимизации распределения потоков.
-Запуск: streamlit run app.py
-"""
-
 import streamlit as st
 import json
 import os
@@ -11,9 +6,9 @@ import io
 import time
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from contextlib import redirect_stdout
 from PIL import Image
+import threading
 
 # Добавляем src в путь для импортов
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
@@ -51,6 +46,22 @@ st.markdown("""
         font-size: 1.2rem;
         font-weight: bold;
     }
+    .training-log {
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 0.9rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .epoch-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,13 +98,13 @@ def display_delivery_report(delivery: dict):
         status = "✓" if shortage_pct < 1 else "⚠️" if shortage_pct < 10 else "❌"
         
         data.append({
-            "Статус": status,
+            "": status,
             "Источник": item['source'],
             "Потребитель": item['consumer'],
             "Заявлено (кВт)": f"{item['requested']:,.2f}",
             "Доставлено (кВт)": f"{item['delivered']:,.2f}",
-            "Недопоставка (кВт)": f"{item['shortage']:,.2f}",
-            "Недопоставка (%)": f"{shortage_pct:.1f}%"
+            "Недопоставка": f"{item['shortage']:,.2f}",
+            "%": f"{shortage_pct:.1f}"
         })
     
     df = pd.DataFrame(data)
@@ -108,10 +119,7 @@ def display_delivery_report(delivery: dict):
         problems = sum(1 for d in delivery['items'] if d.get('shortage_pct', 0) >= 10)
         st.metric("⚠️ Проблемные", problems)
     
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Скачать отчёт (CSV)", csv, "delivery_report.csv", "text/csv")
+    st.dataframe(df, width='stretch', hide_index=True)
 
 
 def main():
@@ -163,39 +171,51 @@ def main():
                 st.warning("Загрузите оба файла")
                 st.stop()
         
-        # Настройки обучения
+        # Настройки ML
         if "ML" in mode:
             st.markdown("---")
             st.header("🎛️ Параметры обучения")
             
-            with st.expander("Данные", expanded=False):
+            with st.expander("📊 Данные", expanded=False):
                 num_samples = st.slider("Сэмплов на уровень", 100, 5000, 500, 100)
                 sparsity_options = st.multiselect(
                     "Уровни разреженности",
                     [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
                     default=[0.1, 0.3, 0.5, 0.7, 0.9]
                 )
-                demand_scales = st.multiselect(
+                demand_scale_factors = st.multiselect(
                     "Масштабы заявок",
-                    [0.25, 0.5, 0.75, 1.0, 1.5, 2.0],
-                    default=[0.5, 1.0]
+                    [0.01, 0.02, 0.04, 0.08, 0.1, 0.2, 0.5, 1.0],
+                    default=[0.02, 0.04]
                 )
             
-            with st.expander("Обучение", expanded=False):
+            with st.expander("🏋️ Обучение", expanded=False):
                 col1, col2 = st.columns(2)
                 with col1:
-                    batch_size = st.selectbox("Размер батча", [32, 64, 128, 256], index=1)
+                    batch_size = st.selectbox("Размер батча", [32, 64, 128, 256], index=2)
                     epochs = st.slider("Количество эпох", 10, 500, 100, 10)
-                with col2:
                     lr = st.selectbox(
                         "Learning rate",
                         [1e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
+                        index=3,
+                        format_func=lambda x: f"{x:.0e}"
+                    )
+                with col2:
+                    patience = st.slider("Терпение (early stopping)", 3, 50, 10)
+                    min_delta = st.selectbox(
+                        "Min delta (чувствительность)",
+                        [1e-6, 1e-5, 1e-4, 1e-3],
                         index=2,
                         format_func=lambda x: f"{x:.0e}"
                     )
-                    patience = st.slider("Терпение (early stopping)", 3, 50, 10)
+                    grad_eps = st.selectbox(
+                        "Gradient epsilon (солвер)",
+                        [0.001, 0.01, 0.05, 0.1],
+                        index=1,
+                        format_func=lambda x: f"{x:.3f}"
+                    )
             
-            with st.expander("Функция потерь", expanded=False):
+            with st.expander("📉 Функция потерь", expanded=False):
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     demand_weight = st.number_input("demand_weight", 0.1, 1000.0, 10.0, 0.5)
@@ -203,6 +223,15 @@ def main():
                     excess_weight = st.number_input("excess_weight", 0.1, 100.0, 1.5, 0.5)
                 with col3:
                     capacity_weight = st.number_input("capacity_weight", 0.1, 100.0, 1.8, 0.5)
+            
+            with st.expander("🏗️ Архитектура модели", expanded=False):
+                col1, col2 = st.columns(2)
+                with col1:
+                    hidden_dim1 = st.selectbox("Скрытый слой 1", [256, 512, 768, 1024], index=1)
+                    hidden_dim2 = st.selectbox("Скрытый слой 2", [128, 256, 512, 768], index=1)
+                with col2:
+                    hidden_dim3 = st.selectbox("Скрытый слой 3", [64, 128, 256, 512], index=1)
+                    dropout_rate = st.slider("Dropout", 0.0, 0.7, 0.3, 0.05)
         
         # Настройки солвера
         if "солвер" in mode or "пайплайн" in mode:
@@ -223,13 +252,17 @@ def main():
                     index=2,
                     format_func=lambda x: f"{x:.0e}"
                 )
+                solver_patience = st.slider("Терпение (солвер)", 5, 100, 20)
+                solver_verbose = st.checkbox("Подробный вывод", value=True)
         else:
             solver_lr = 0.3
             solver_max_iter = 1000
             solver_epsilon = 1e-4
+            solver_patience = 20
+            solver_verbose = True
         
         st.markdown("---")
-        run_button = st.button("🚀 ЗАПУСТИТЬ", type="primary", use_container_width=True)
+        run_button = st.button("🚀 ЗАПУСТИТЬ", type="primary", width='stretch')
     
     # Основная область
     if not run_button:
@@ -254,49 +287,55 @@ def main():
     st.success(f"✓ Граф загружен: {len(graph.nodes)} узлов, {len(graph.edges)} рёбер")
     
     # Формируем конфиг
-    if "ML" in mode:
-        config = {
-            "training": {
-                "num_samples_per_level": num_samples,
-                "sparsity_levels": sparsity_options,
-                "demand_scale_factors": demand_scales,
-                "batch_size": batch_size,
-                "epochs": epochs,
-                "learning_rate": lr,
-                "early_stopping_patience": patience,
-                "min_delta": 1e-4
-            },
-            "model": {
-                "hidden_dims": [512, 256, 128],
-                "dropout_rate": 0.3
-            },
-            "loss": {
-                "demand_weight": demand_weight,
-                "excess_weight": excess_weight,
-                "capacity_weight": capacity_weight
-            },
-            "solver": {
-                "learning_rate": solver_lr,
-                "max_iter": solver_max_iter,
-                "epsilon": solver_epsilon,
-                "gradient_epsilon_rel": 0.01,
-                "verbose": False
-            },
-            "visualization": {
-                "training": True,
-                "flows": True,
-                "save_report": True,
-                "visualize_data": False
-            },
-            "paths": {
-                "generated_folder": "genereted",
-                "model_save_name": "model.pt",
-                "graph_html": "graph.html"
-            }
+    config = {
+        "training": {
+            "num_samples_per_level": num_samples if 'num_samples' in dir() else 500,
+            "sparsity_levels": sparsity_options if 'sparsity_options' in dir() else [0.1, 0.3, 0.5, 0.7, 0.9],
+            "demand_scale_factors": demand_scale_factors if 'demand_scale_factors' in dir() else [0.02, 0.04],
+            "batch_size": batch_size if 'batch_size' in dir() else 128,
+            "epochs": epochs if 'epochs' in dir() else 100,
+            "learning_rate": lr if 'lr' in dir() else 1e-3,
+            "early_stopping_patience": patience if 'patience' in dir() else 10,
+            "min_delta": min_delta if 'min_delta' in dir() else 1e-4,
+            "gradient_epsilon_rel": grad_eps if 'grad_eps' in dir() else 0.01
+        },
+        "model": {
+            "hidden_dims": [
+                hidden_dim1 if 'hidden_dim1' in dir() else 512,
+                hidden_dim2 if 'hidden_dim2' in dir() else 256,
+                hidden_dim3 if 'hidden_dim3' in dir() else 128
+            ],
+            "dropout_rate": dropout_rate if 'dropout_rate' in dir() else 0.3
+        },
+        "loss": {
+            "demand_weight": demand_weight if 'demand_weight' in dir() else 10.0,
+            "excess_weight": excess_weight if 'excess_weight' in dir() else 1.5,
+            "capacity_weight": capacity_weight if 'capacity_weight' in dir() else 1.8
+        },
+        "solver": {
+            "learning_rate": solver_lr,
+            "max_iter": solver_max_iter,
+            "epsilon": solver_epsilon,
+            "early_stopping_patience": solver_patience,
+            "gradient_epsilon_rel": grad_eps if 'grad_eps' in dir() else 0.01,
+            "capacity_weight": capacity_weight if 'capacity_weight' in dir() else 1.8,
+            "verbose": solver_verbose
+        },
+        "visualization": {
+            "training": True,
+            "flows": True,
+            "save_report": True,
+            "visualize_data": True
+        },
+        "paths": {
+            "generated_folder": "genereted",
+            "model_save_name": "model.pt",
+            "graph_html": "graph.html"
         }
-        
-        with open('settings/config.json', 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2)
+    }
+    
+    with open('settings/config.json', 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2)
     
     train_cfg = ConfigParser('settings/config.json')
     
@@ -327,98 +366,220 @@ def main():
     try:
         if run_cfg.mode == "train":
             from ml.pipeline import run_training
-            from ml.inference import FlowPredictor
-            from ml.loss import EdgeFlowCalculator
-            import torch
             
             st.subheader("🧠 Обучение ML-модели")
             
             status_container = st.empty()
             progress_bar = st.progress(0)
+            log_placeholder = st.empty()
+            epoch_placeholder = st.empty()
             
-            status_container.text("⏳ Генерация данных и обучение...")
-            progress_bar.progress(10)
+            log_buffer = io.StringIO()
             
-            log_stream = io.StringIO()
+            class TeeOutput:
+                def __init__(self, buffer):
+                    self.buffer = buffer
+                    self.terminal = sys.stdout
+                def write(self, message):
+                    self.terminal.write(message)
+                    self.terminal.flush()
+                    self.buffer.write(message)
+                def flush(self):
+                    self.terminal.flush()
             
-            with redirect_stdout(log_stream):
-                result = run_training(graph, registry, run_cfg, train_cfg)
+            tee = TeeOutput(log_buffer)
+            original_stdout = sys.stdout
+            sys.stdout = tee
             
-            progress_bar.progress(90)
-            status_container.text("✅ Обучение завершено!")
-            
-            # Логи
-            st.markdown("---")
-            st.subheader("📝 Логи обучения")
-            st.text_area("Вывод", log_stream.getvalue(), height=300)
-            
-            # Графики
-            st.markdown("---")
-            st.subheader("📈 Графики обучения")
-            
-            gen_folder = train_cfg.paths.generated_folder
-            
-            history_file = f"{gen_folder}/training_history.png"
-            if os.path.exists(history_file):
-                st.image(Image.open(history_file), caption="История обучения", use_container_width=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                pca_file = f"{gen_folder}/pca_training_data.png"
-                if os.path.exists(pca_file):
-                    st.image(Image.open(pca_file), caption="PCA", use_container_width=True)
-            with col2:
-                dist_file = f"{gen_folder}/distribution_training_data.png"
-                if os.path.exists(dist_file):
-                    st.image(Image.open(dist_file), caption="Распределение", use_container_width=True)
-            
-            progress_bar.progress(100)
-            st.success(f"✅ Модель сохранена в `{gen_folder}/{train_cfg.paths.model_save_name}`")
-            
-            # Тестирование
-            st.markdown("---")
-            st.subheader("🧪 Тестирование на реальных данных")
-            
-            with st.spinner("Загрузка модели..."):
-                extractor = FeatureExtractor(graph, registry)
-                device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            try:
+                status_container.text("⏳ Генерация данных и обучение...")
+                progress_bar.progress(5)
                 
-                model_path = f"{gen_folder}/{train_cfg.paths.model_save_name}"
-                checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+                training_done = threading.Event()
                 
-                from ml.model import PathWeightNetwork
-                model = PathWeightNetwork(
-                    input_dim=checkpoint['feature_dim'],
-                    output_shape=checkpoint['output_shape'],
-                    hidden_dims=tuple(train_cfg.model.hidden_dims),
-                    dropout_rate=train_cfg.model.dropout_rate
-                )
-                model.load_state_dict(checkpoint['model_state_dict'])
-                model.set_path_mask(checkpoint['path_mask'])
-                model.to(device).eval()
+                def train_thread():
+                    run_training(graph, registry, run_cfg, train_cfg)
+                    training_done.set()
                 
-                edge_calc = EdgeFlowCalculator(registry, extractor)
-                predictor = FlowPredictor(model, extractor, edge_calc, device)
+                thread = threading.Thread(target=train_thread)
+                thread.start()
                 
-                with open(f"settings/{run_cfg.flows_file}", 'r', encoding='utf-8') as f:
-                    base_flows = json.load(f)
+                epoch_info = {"current": 0, "total": train_cfg.training.epochs, "status": ""}
                 
-                raw_real = extractor.build_raw_features(base_flows)
-                real_feat, real_mask = extractor.normalize_features(raw_real)
-                results = predictor.predict_with_normalized(real_feat, base_flows, real_mask)
+                while not training_done.is_set():
+                    thread.join(timeout=0.5)
+                    current_logs = log_buffer.getvalue()
+                    
+                    log_lines = current_logs.split('\n')
+                    epoch_lines = [l for l in log_lines if 'Epoch' in l and '|' in l]
+                    
+                    if epoch_lines:
+                        last_epoch = epoch_lines[-1]
+                        try:
+                            parts = last_epoch.split('|')
+                            epoch_num = int(parts[0].replace('Epoch', '').strip())
+                            epoch_info["current"] = epoch_num
+                            epoch_info["status"] = last_epoch.strip()
+                        except:
+                            pass
+                    
+                    pct = min(epoch_info["current"] / max(epoch_info["total"], 1), 1.0)
+                    progress_bar.progress(int(5 + pct * 85))
+                    
+                    if epoch_info["status"]:
+                        epoch_placeholder.markdown(
+                            f"""
+                            <div class="epoch-badge">
+                                <b>Эпоха {epoch_info["current"]} / {epoch_info["total"]}</b><br>
+                                <small>{epoch_info["status"]}</small>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    
+                    other_lines = [l for l in log_lines[-40:] if 'Epoch' not in l or '|' not in l]
+                    if other_lines:
+                        newline = "\n"
+                        log_placeholder.markdown(
+                            f'<div class="training-log"><pre>{newline.join(other_lines[-15:])}</pre></div>',
+                            unsafe_allow_html=True
+                        )
                 
-                col1, col2, col3 = st.columns(3)
+                final_logs = log_buffer.getvalue()
+                progress_bar.progress(95)
+                status_container.text("✅ Обучение завершено!")
+                epoch_placeholder.empty()
+                
+                with st.expander("📝 Полные логи обучения"):
+                    st.text_area("Логи", final_logs, height=300)
+                
+                # Графики
+                st.markdown("---")
+                st.subheader("📈 Графики обучения")
+                
+                gen_folder = train_cfg.paths.generated_folder
+                
+                loss_file = f"{gen_folder}/loss_curves.png"
+                comp_file = f"{gen_folder}/loss_components.png"
+                
+                col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("Заявлено", f"{results.get('demanded', 0):,.1f} кВт")
+                    if os.path.exists(loss_file):
+                        st.image(Image.open(loss_file), caption="Кривые обучения", width='stretch')
                 with col2:
-                    delivered = results.get('total_delivered', 0)
-                    demanded = results.get('demanded', 1)
-                    ratio = delivered / demanded * 100 if demanded > 0 else 0
-                    st.metric("Доставлено (ML)", f"{delivered:,.1f} кВт", delta=f"{ratio:.1f}%")
-                with col3:
+                    if os.path.exists(comp_file):
+                        st.image(Image.open(comp_file), caption="Компоненты функции потерь", width='stretch')
+                
+                progress_bar.progress(100)
+                st.success(f"✅ Модель сохранена в `{gen_folder}/{train_cfg.paths.model_save_name}`")
+                
+                # Тестирование на реальных данных
+                st.markdown("---")
+                st.subheader("🧪 Тестирование на реальных данных")
+                
+                with st.spinner("Загрузка модели и тестирование..."):
+                    from ml.inference import FlowPredictor
+                    from ml.loss import EdgeFlowCalculator
+                    from ml.model import PathWeightNetwork
+                    import torch
+                    
+                    extractor = FeatureExtractor(graph, registry)
+                    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+                    
+                    model_path = f"{gen_folder}/{train_cfg.paths.model_save_name}"
+                    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
+                    
+                    model = PathWeightNetwork(
+                        input_dim=checkpoint['feature_dim'],
+                        output_shape=checkpoint['output_shape'],
+                        hidden_dims=tuple(train_cfg.model.hidden_dims),
+                        dropout_rate=train_cfg.model.dropout_rate
+                    )
+                    model.load_state_dict(checkpoint['model_state_dict'])
+                    model.set_path_mask(checkpoint['path_mask'])
+                    model.to(device).eval()
+                    
+                    edge_calc = EdgeFlowCalculator(registry, extractor)
+                    predictor = FlowPredictor(model, extractor, edge_calc, device)
+                    
+                    with open(f"settings/{run_cfg.flows_file}", 'r', encoding='utf-8') as f:
+                        base_flows = json.load(f)
+                    
+                    raw_real = extractor.build_raw_features(base_flows)
+                    real_feat, real_mask = extractor.normalize_features(raw_real)
+                    results = predictor.predict_with_normalized(real_feat, base_flows, real_mask)
+                    
+                    # Метрики
+                    st.markdown("### 📊 Результаты ML-предсказания")
+                    
                     edge_utils = results.get('edge_utilization', np.array([]))
-                    overloaded = (edge_utils > 0.95).sum()
-                    st.metric("Перегружено рёбер", int(overloaded))
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Заявлено", f"{results.get('demanded', 0):,.1f} кВт")
+                    with col2:
+                        delivered = results.get('total_delivered', 0)
+                        demanded = results.get('demanded', 1)
+                        ratio = delivered / demanded * 100 if demanded > 0 else 0
+                        st.metric("Доставлено (ML)", f"{delivered:,.1f} кВт", delta=f"{ratio:.1f}%")
+                    with col3:
+                        overloaded = int((edge_utils > 0.95).sum())
+                        st.metric("Перегружено рёбер", overloaded, delta="⚠️" if overloaded > 0 else "✓")
+                    with col4:
+                        high_load = int(((edge_utils > 0.7) & (edge_utils <= 0.95)).sum())
+                        st.metric("Высокая загрузка", high_load)
+                    
+                    # Анализ рёбер
+                    st.markdown("---")
+                    st.subheader("🔍 Анализ загрузки рёбер")
+                    
+                    edge_data = []
+                    edge_flows_arr = results.get('edge_flows', np.array([]))
+                    for i, edge in enumerate(extractor.edges):
+                        cap = edge.capacity if edge.capacity != float('inf') else float('inf')
+                        flow = edge_flows_arr[i] if i < len(edge_flows_arr) else 0
+                        util = edge_utils[i] * 100 if i < len(edge_utils) else 0
+                        
+                        if util > 95:
+                            status = "🔴"
+                        elif util > 70:
+                            status = "🟠"
+                        elif util > 30:
+                            status = "🟡"
+                        else:
+                            status = "🟢"
+                        
+                        edge_data.append({
+                            "": status,
+                            "Ребро": f"{edge.nodes[0].name} ↔ {edge.nodes[1].name}",
+                            "Поток (кВт)": f"{flow:,.2f}",
+                            "Максимум (кВт)": f"{cap:,.2f}" if cap != float('inf') else "∞",
+                            "Загрузка": f"{util:.1f}%"
+                        })
+                    
+                    df_edges = pd.DataFrame(edge_data)
+                    df_edges['_sort'] = [float(u.replace('%', '')) for u in df_edges['Загрузка']]
+                    df_edges = df_edges.sort_values('_sort', ascending=False).drop(columns=['_sort'])
+                    
+                    # show_all = st.checkbox("Показать все рёбра", value=False)
+                    # if not show_all:
+                    #     df_edges = df_edges[df_edges[''].isin(['🔴', '🟠'])]
+                    
+                    # st.dataframe(df_edges, width='stretch', hide_index=True)
+                    
+                    # Граф потоков
+                    st.markdown("---")
+                    st.subheader("🔗 Граф потоков (ML-предсказание)")
+                    
+                    ml_graph_path = f"{gen_folder}/ml_prediction.html"
+                    if os.path.exists(ml_graph_path):
+                        with open(ml_graph_path, 'r', encoding='utf-8') as f:
+                            st.components.v1.html(f.read(), height=700, scrolling=True)
+                    else:
+                        st.warning(f"Файл графа не найден: {ml_graph_path}")
+            
+            finally:
+                sys.stdout = original_stdout
         
         elif run_cfg.mode == "solve":
             from ml.pipeline import run_solver_pipeline
@@ -430,59 +591,145 @@ def main():
             
             status_container = st.empty()
             progress_bar = st.progress(0)
+            log_placeholder = st.empty()
+            iter_placeholder = st.empty()  # для красивого вывода итераций
             
-            status_container.text("⏳ Расчёт...")
-            progress_bar.progress(30)
+            log_buffer = io.StringIO()
             
-            log_stream = io.StringIO()
+            class TeeOutput:
+                def __init__(self, buffer):
+                    self.buffer = buffer
+                    self.terminal = sys.stdout
+                def write(self, message):
+                    self.terminal.write(message)
+                    self.terminal.flush()
+                    self.buffer.write(message)
+                def flush(self):
+                    self.terminal.flush()
             
-            with redirect_stdout(log_stream):
-                result, solver = run_solver_pipeline(graph, registry, run_cfg, train_cfg)
+            tee = TeeOutput(log_buffer)
+            original_stdout = sys.stdout
+            sys.stdout = tee
             
-            progress_bar.progress(70)
+            try:
+                max_iter = train_cfg.solver.max_iter
+                
+                solver_done = threading.Event()
+                solver_result = {}
+                
+                def solver_thread():
+                    result, s = run_solver_pipeline(graph, registry, run_cfg, train_cfg)
+                    solver_result['result'] = result
+                    solver_result['solver'] = s
+                    solver_done.set()
+                
+                thread = threading.Thread(target=solver_thread)
+                thread.start()
+                
+                iter_info = {"current": 0, "loss": 0.0}
+                
+                while not solver_done.is_set():
+                    thread.join(timeout=0.3)
+                    current_logs = log_buffer.getvalue()
+                    log_lines = current_logs.split('\n')
+                    
+                    # Ищем строки с итерациями
+                    iter_lines = [l for l in log_lines if 'Итерация' in l and 'loss' in l.lower()]
+                    
+                    if iter_lines:
+                        last_iter = iter_lines[-1]
+                        try:
+                            # Парсим: "Итерация  100: loss = 123.45 кВт ..."
+                            parts = last_iter.split(':')
+                            iter_num = int(parts[0].replace('Итерация', '').strip())
+                            loss_part = parts[1].split('=')[1].split('кВт')[0].strip()
+                            iter_info["current"] = iter_num
+                            iter_info["loss"] = float(loss_part)
+                        except:
+                            pass
+                    
+                    pct = min(iter_info["current"] / max(max_iter, 1), 1.0)
+                    progress_bar.progress(int(10 + pct * 80))
+                    
+                    if iter_info["current"] > 0:
+                        loss_color = "#27ae60" if iter_info["loss"] < 100 else "#f39c12" if iter_info["loss"] < 1000 else "#e74c3c"
+                        iter_placeholder.markdown(
+                            f"""
+                            <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
+                                        color: white; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                                <b>Итерация {iter_info["current"]} / {max_iter}</b><br>
+                                <small>Текущий loss: <b style="color: {loss_color};">{iter_info["loss"]:.2f} кВт</b></small>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+                    
+                    other_lines = [l for l in log_lines[-30:] if 'Итерация' not in l]
+                    if other_lines:
+                        newline = "\n"
+                        log_placeholder.markdown(
+                            f'<div class="training-log"><pre>{newline.join(other_lines[-10:])}</pre></div>',
+                            unsafe_allow_html=True
+                        )
+                
+                # Финальное состояние
+                final_logs = log_buffer.getvalue()
+                progress_bar.progress(95)
+                status_container.text("✅ Расчёт завершён!")
+                iter_placeholder.empty()
+                
+                result = solver_result.get('result')
+                solver = solver_result.get('solver')
+                
+                with st.expander("📝 Полные логи расчёта"):
+                    st.text_area("Логи", final_logs, height=300)
+                
+                if result and solver:
+                    delivery = solver.get_delivery_report()
+                    
+                    st.markdown("---")
+                    st.subheader("📊 Ключевые метрики")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Заявлено", f"{delivery['total_requested']:,.1f} кВт")
+                    with col2:
+                        ratio = delivery['total_delivered'] / delivery['total_requested'] * 100
+                        st.metric("Доставлено", f"{delivery['total_delivered']:,.1f} кВт", 
+                                 delta=f"{ratio:.1f}%")
+                    with col3:
+                        violations = solver.get_edge_violations()
+                        st.metric("Рёбер с превышением", len(violations),
+                                 delta="✓" if not violations else f"⚠️ {len(violations)}")
+                    
+                    st.markdown("---")
+                    tab1, tab2, tab3 = st.tabs([
+                        "🔗 Граф потоков", "📋 Доставка", "📈 Обучение солвера"
+                    ])
+                    
+                    with tab1:
+                        output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
+                        if os.path.exists(output_path):
+                            with open(output_path, 'r', encoding='utf-8') as f:
+                                st.components.v1.html(f.read(), height=700, scrolling=True)
+                        else:
+                            st.warning("Файл графа не найден.")
+                    
+                    with tab2:
+                        display_delivery_report(delivery)
+                    
+                    with tab3:
+                        history_file = f"{train_cfg.paths.generated_folder}/solver_history.png"
+                        if os.path.exists(history_file):
+                            st.image(Image.open(history_file), width='stretch')
+                        else:
+                            st.warning("График обучения солвера не найден")
+                
+                progress_bar.progress(100)
+                status_container.text("✅ Расчёт завершён!")
             
-            if result:
-                delivery = solver.get_delivery_report()
-                
-                st.markdown("---")
-                st.subheader("📊 Ключевые метрики")
-                
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Заявлено", f"{delivery['total_requested']:,.1f} кВт")
-                with col2:
-                    ratio = delivery['total_delivered'] / delivery['total_requested'] * 100
-                    st.metric("Доставлено", f"{delivery['total_delivered']:,.1f} кВт", 
-                             delta=f"{ratio:.1f}%")
-                with col3:
-                    violations = solver.get_edge_violations()
-                    st.metric("Рёбер с превышением", len(violations),
-                             delta="✓" if not violations else f"⚠️ {len(violations)}")
-                
-                st.markdown("---")
-                tab1, tab2, tab3, tab4 = st.tabs([
-                    "🔗 Граф потоков", "📋 Доставка", "📈 Обучение", "📝 Логи"
-                ])
-                
-                with tab1:
-                    output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
-                    if os.path.exists(output_path):
-                        with open(output_path, 'r', encoding='utf-8') as f:
-                            st.components.v1.html(f.read(), height=700, scrolling=True)
-                
-                with tab2:
-                    display_delivery_report(delivery)
-                
-                with tab3:
-                    history_file = f"{train_cfg.paths.generated_folder}/solver_history.png"
-                    if os.path.exists(history_file):
-                        st.image(Image.open(history_file), use_container_width=True)
-                
-                with tab4:
-                    st.text_area("Логи", log_stream.getvalue(), height=300)
-            
-            progress_bar.progress(100)
-            status_container.text("✅ Расчёт завершён!")
+            finally:
+                sys.stdout = original_stdout
     
     except Exception as e:
         st.error(f"❌ Ошибка: {str(e)}")

@@ -3,6 +3,6 @@
   "flows_file": "flows.json",
   "visualize_flows": true,
   "mode": "solve",
-  "use_ml_initial_guess": false,
+  "use_ml_initial_guess": true,
   "model_path": "genereted/model.pt"
 }

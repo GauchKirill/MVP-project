@@ -49,10 +49,6 @@ def print_results(results, extractor):
                       f"{flow:.1f} / {cap:.1f} кВт ({util:.1f}%)")
 
 def run_training(graph, registry, run_cfg, train_cfg):
-    # Загрузка заявок
-    with open(f"settings/{run_cfg.flows_file}") as f:
-        base_flows = json.load(f)
-
     extractor = FeatureExtractor(graph, registry)
     path_mask = extractor.create_path_mask()
 
@@ -99,8 +95,7 @@ def run_training(graph, registry, run_cfg, train_cfg):
     edge_calc = EdgeFlowCalculator(registry, extractor)
     loss_fn = PowerFlowLoss(
         capacity_weight=train_cfg.loss.capacity_weight,
-        demand_weight=train_cfg.loss.demand_weight,
-        excess_weight=train_cfg.loss.excess_weight
+        demand_weight=train_cfg.loss.demand_weight
     )
     trainer = ModelTrainer(model, extractor, edge_calc, loss_fn, device)
     trainer.configure_optimizer(lr=train_cfg.training.learning_rate)
@@ -114,6 +109,14 @@ def run_training(graph, registry, run_cfg, train_cfg):
         min_delta=train_cfg.get('training.min_delta', 1e-6)
     )
 
+    # Графики
+    trainer.plot_loss_curves(
+        filename=f"{train_cfg.paths.generated_folder}/loss_curves.png"
+    )
+    trainer.plot_loss_components(
+        filename=f"{train_cfg.paths.generated_folder}/loss_components.png"
+    )
+
     os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
 
     # Сохранение модели
@@ -124,24 +127,12 @@ def run_training(graph, registry, run_cfg, train_cfg):
         'path_mask': path_mask
     }, f"{train_cfg.paths.generated_folder}/{train_cfg.paths.model_save_name}")
 
-    # Тестирование на реальных данных
-    predictor = FlowPredictor(model, extractor, edge_calc, device)
-    raw_real = extractor.build_raw_features(base_flows)
-    real_feat, real_mask = extractor.normalize_features(raw_real)
-    results = predictor.predict_with_normalized(real_feat, base_flows, real_mask)
-
-    print_results(results, extractor)
-    if train_cfg.visualization.flows:
-        fv = FlowVisualizer(graph, extractor, registry, train_cfg.paths.generated_folder)
-        fv.create_flow_html(results, base_flows, 'flow_base.html', 'Базовый сценарий')
-
 def run_prediction(graph, registry, run_cfg, train_cfg):
     with open(f"settings/{run_cfg.flows_file}") as f:
         base_flows = json.load(f)
 
     extractor = FeatureExtractor(graph, registry)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    print(f" Device is {device}")
     checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
     model = PathWeightNetwork(
         input_dim=checkpoint['feature_dim'],
@@ -160,9 +151,51 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
     results = predictor.predict_with_normalized(real_feat, base_flows, real_mask)
 
     print_results(results, extractor)
+    
     if run_cfg.visualize_flows:
-        fv = FlowVisualizer(graph, extractor, registry, train_cfg.paths.generated_folder)
-        fv.create_flow_html(results, base_flows, 'flow_base.html', 'Базовый сценарий')
+        # Подготовка данных для визуализации
+        edge_flows = results['edge_flows']
+        edge_utils = results['edge_utilization']
+        
+        edge_loads = {}
+        for i, edge in enumerate(extractor.edges):
+            edge_loads[edge] = (float(edge_flows[i]), float(edge_utils[i]))
+        
+        # Направленные потоки из path_flows
+        directed_flows = {}
+        for s_idx in range(extractor.S):
+            for c_idx in range(extractor.C):
+                for p_idx in range(extractor.max_paths):
+                    flow = results['path_flows'][s_idx, c_idx, p_idx]
+                    if flow > 0:
+                        request = None
+                        for req in registry.requests:
+                            if (extractor.source_to_idx.get(req.source.name) == s_idx and 
+                                extractor.consumer_to_idx.get(req.consumer.name) == c_idx):
+                                request = req
+                                break
+                        if request and p_idx < len(request.paths):
+                            path = request.paths[p_idx]
+                            current = request.source
+                            for edge in path:
+                                next_node = edge.nodes[1] if edge.nodes[0] == current else edge.nodes[0]
+                                key = (current.name, next_node.name)
+                                directed_flows[key] = directed_flows.get(key, 0.0) + float(flow)
+                                current = next_node
+        
+        # Создаём ОДИН файл визуализации
+        view = GraphView(graph)
+        os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
+        view.draw_with_directed_flows(
+            edge_loads, 
+            directed_flows, 
+            filename=f"{train_cfg.paths.generated_folder}/ml_prediction.html",
+            title="ML-предсказание потоков",
+            total_demanded=results['demanded'],
+            total_delivered=results['total_delivered'],
+            flows_data=base_flows  # ← добавить
+        )
+        print(f"✓ Граф ML-предсказания сохранён в {train_cfg.paths.generated_folder}/ml_prediction.html")
 
 def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     """Запуск солвера с опциональным ML-начальным приближением"""
@@ -244,8 +277,6 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         epsilon=solver_cfg.epsilon,
         gradient_epsilon_rel=solver_cfg.gradient_epsilon_rel,
         capacity_weight=solver_cfg.capacity_weight,
-        demand_weight=solver_cfg.demand_weight,
-        excess_weight=solver_cfg.excess_weight,
         early_stopping_patience=solver_cfg.early_stopping_patience,
         verbose=solver_cfg.verbose
     )
@@ -300,6 +331,7 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
 
     os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
     # Визуализация
+        # Визуализация (в конце run_solver_pipeline)
     if run_cfg.visualize_flows:
         os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
         print("Визуализация решения:")
@@ -308,7 +340,15 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         directed_flows = solver.get_directed_edge_flows()
         
         output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
-        view.draw_with_directed_flows(edge_loads, directed_flows, filename=output_path)
+        view.draw_with_directed_flows(
+            edge_loads, 
+            directed_flows, 
+            filename=output_path,
+            title="Результат точного расчёта (солвер)",
+            total_demanded=delivery['total_requested'],
+            total_delivered=delivery['total_delivered'],
+            flows_data=base_flows  # ← добавить
+        )
     
     # График обучения солвера
     solver.plot_training_history(
