@@ -1,8 +1,8 @@
 {
   "edges_file": "edges.json",
   "flows_file": "flows.json",
-  "mode": "predict",
+  "visualize_flows": true,
+  "mode": "train",
   "use_ml_initial_guess": true,
-  "model_path": "genereted/model.pt",
-  "visualize_flows": true
+  "model_path": "genereted/model.pt"
 }

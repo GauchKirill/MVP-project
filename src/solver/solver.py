@@ -2,6 +2,8 @@ import copy
 from typing import List, Dict, Tuple
 from graph import Edge, Graph
 import matplotlib.pyplot as plt
+from tqdm import tqdm
+from collections import defaultdict
 
 from .flow_instance import FlowInstance
 
@@ -318,58 +320,69 @@ class Solver:
                     inst.path_flows[key] *= scale
 
     def optimize(self) -> Dict:
-        """Выполняет градиентный спуск"""
+        """Выполняет градиентный спуск с прогресс-баром."""
         if not self.instances:
             return {'success': False, 'message': 'Нет экземпляров потоков'}
 
         self.loss_history = []
         
         loss = 0.0
-        components = {'shortage': 0.0, 'capacity_violation': 0.0, 'total_loss': 0.0}
+        components = {'shortage': 0.0, 'excess': 0.0, 'capacity_violation': 0.0, 'total_loss': 0.0}
 
-        # Для ранней остановки: отслеживаем лучшее состояние
+        # Для ранней остановки
         best_loss = float('inf')
         best_state = None
         best_iteration = 0
+        patience_counter = 0
 
-        for iteration in range(self.max_iter):
+        # Прогресс-бар
+        pbar = tqdm(range(self.max_iter), desc="Решатель", unit="iter")
+        
+        for iteration in pbar:
             loss, components = self.compute_loss()
             self.loss_history.append(loss)
 
             # Сохраняем лучшее состояние
-            if loss < best_loss:
+            if loss < best_loss - self.epsilon:
                 best_loss = loss
                 best_iteration = iteration
+                patience_counter = 0
                 # Глубокая копия текущих потоков
                 best_state = {}
                 for inst_idx, inst in enumerate(self.instances):
                     best_state[inst_idx] = inst.path_flows.copy()
+            else:
+                patience_counter += 1
 
-            if self.verbose and iteration % 5 == 0:
-                print(f"Итерация {iteration:4d}: loss = {loss:.2f} "
-                      f"(shortage={components['shortage']:.2f}, "
-                      f"cap_viol={components['capacity_violation']:.2f})")
+            # Обновляем прогресс-бар
+            pbar.set_postfix({
+                'loss': f'{loss:.2f}',
+                'best': f'{best_loss:.2f}',
+                'short': f'{components["shortage"]:.2f}',
+                'cap': f'{components["capacity_violation"]:.2f}',
+                'pat': f'{patience_counter}/{self.early_stopping_patience}'
+            })
 
             # Проверка сходимости
             if iteration > 0:
                 # Критерий 1: абсолютное изменение меньше epsilon
                 if abs(self.loss_history[-1] - self.loss_history[-2]) < self.epsilon:
                     if self.verbose:
-                        print(f"Сошлось по epsilon на итерации {iteration} с loss = {loss:.2f}")
+                        pbar.write(f"✓ Сошлось по epsilon на итерации {iteration} с loss = {loss:.2f}")
                     break
                 
                 # Критерий 2: нет улучшения на протяжении early_stopping_patience итераций
-                if iteration >= self.early_stopping_patience:
-                    # Проверяем, когда был достигнут лучший результат
-                    if iteration - best_iteration >= self.early_stopping_patience:
-                        if self.verbose:
-                            print(f"Ранняя остановка на итерации {iteration}: "
+                if patience_counter >= self.early_stopping_patience:
+                    if self.verbose:
+                        pbar.write(f"✓ Ранняя остановка на итерации {iteration}: "
                                   f"нет улучшения {self.early_stopping_patience} итераций "
                                   f"(лучший loss = {best_loss:.2f} на итерации {best_iteration})")
-                        break
+                    break
 
             grads = self.compute_gradients()
             self._apply_two_stage_update(grads)
+
+        pbar.close()
 
         # Восстанавливаем лучшее состояние
         if best_state is not None:
@@ -386,14 +399,11 @@ class Solver:
         actual_flows = self.compute_actual_flows(desired_flows)
 
         total_shortage = 0.0
-        total_excess = 0.0
         for inst_idx, inst in enumerate(self.instances):
             inst_paths = [inst._path_to_key(p) for p in inst.get_paths()]
             actual_total = sum(actual_flows.get((inst_idx, pk), 0.0) for pk in inst_paths)
             if actual_total < inst.target_amount:
                 total_shortage += inst.target_amount - actual_total
-            elif actual_total > inst.target_amount:
-                total_excess += actual_total - inst.target_amount
 
         capacity_violation = 0.0
         edge_flows = {edge: 0.0 for edge in self.graph.edges}
@@ -412,7 +422,6 @@ class Solver:
             'success': True,
             'final_loss': best_loss,
             'total_shortage': total_shortage,
-            'total_excess': total_excess,
             'capacity_violation': capacity_violation,
             'iterations': len(self.loss_history),
             'best_iteration': best_iteration,
@@ -603,3 +612,20 @@ class Solver:
                     break
         
         return directed
+    
+    def get_source_consumer_delivery(self) -> Tuple[Dict, Dict]:
+        """
+        Возвращает точные доставки от источников к потребителям.
+        """
+        source_delivery = defaultdict(lambda: defaultdict(float))
+        consumer_receipt = defaultdict(lambda: defaultdict(float))
+        
+        for inst in self.instances:
+            source = inst.request.source.name
+            consumer = inst.request.consumer.name
+            total_flow = inst.get_total_flow()
+            
+            source_delivery[source][consumer] += total_flow
+            consumer_receipt[consumer][source] += total_flow
+        
+        return dict(source_delivery), dict(consumer_receipt)

@@ -2,8 +2,10 @@ import os
 import torch
 import json
 import numpy as np
+from collections import defaultdict
 
 from graph import GraphView
+from solver import FlowsCreator, Solver
 
 from .feature_extractor import FeatureExtractor
 from .model import PathWeightNetwork
@@ -11,9 +13,171 @@ from .loss import EdgeFlowCalculator, PowerFlowLoss
 from .inference import FlowPredictor
 from .training import ModelTrainer
 from .data_generator import DataGenerator
-from graph import Graph, GraphView, RequestRegistry
-from solver import FlowsCreator, Solver, FlowInstance
-from .visualization import FlowVisualizer
+
+
+# ============================================================================
+#  Единые функции для результатов (не зависят от ML/Solver)
+# ============================================================================
+
+def _build_requests_from_flows(graph, directed_flows, flows_data):
+    """
+    Строит список заявок на основе направленных потоков.
+    Отслеживает потоки от источников к потребителям по всем путям.
+    """
+    # Шаг 1: строим граф потоков (кто кому передаёт)
+    outgoing = defaultdict(lambda: defaultdict(float))
+    for (u, v), flow in directed_flows.items():
+        outgoing[u][v] += flow
+    
+    # Шаг 2: для каждого источника запускаем DFS для отслеживания потоков до потребителей
+    source_delivery = defaultdict(lambda: defaultdict(float))
+    
+    for node_name, node in graph.nodes.items():
+        if node.type != 'source':
+            continue
+        
+        # DFS от источника
+        visited = set()
+        stack = [(node_name, 1.0)]  # (узел, доля потока от источника)
+        
+        while stack:
+            current, fraction = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            
+            current_type = graph.nodes[current].type
+            
+            for next_node, flow in outgoing[current].items():
+                if next_node not in graph.nodes:
+                    continue
+                next_type = graph.nodes[next_node].type
+                
+                if next_type == 'consumer':
+                    # Дошли до потребителя — записываем поток
+                    source_delivery[node_name][next_node] += flow
+                elif next_type in ('junction', 'additional'):
+                    # Промежуточный узел — идём дальше
+                    if next_node not in visited:
+                        stack.append((next_node, fraction))
+    
+    # Шаг 3: строим requests_list
+    requests_list = []
+    for source, consumers in flows_data.items():
+        for consumer, demand in consumers.items():
+            delivered = source_delivery.get(source, {}).get(consumer, 0.0)
+            
+            requests_list.append({
+                'source': source,
+                'consumer': consumer,
+                'demanded': round(demand, 2),
+                'delivered': round(delivered, 2),
+                'shortage': round(demand - delivered, 2),
+                'delivery_pct': round(delivered / demand * 100, 1) if demand > 0 else 0
+            })
+    
+    return requests_list
+
+
+def _build_edges_from_loads(edge_loads):
+    """
+    Строит список рёбер на основе edge_loads.
+    Не зависит от источника (ML или Solver).
+    """
+    edges_list = []
+    for edge, (flow, ratio) in edge_loads.items():
+        cap = edge.capacity if edge.capacity != float('inf') else float('inf')
+        edges_list.append({
+            'edge': f"{edge.nodes[0].name} ↔ {edge.nodes[1].name}",
+            'capacity': 'inf' if cap == float('inf') else round(float(cap), 2),
+            'flow': round(float(flow), 2),
+            'utilization': round(float(ratio) * 100, 1)
+        })
+    return edges_list
+
+
+def save_flow_results(stats, requests, edges, source_type, filename):
+    """Сохраняет результаты потокораспределения в JSON."""
+    def convert(obj):
+        if isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, dict):
+            return {k: convert(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert(item) for item in obj]
+        return obj
+    
+    report = convert({
+        'source': source_type,
+        'summary': {
+            'total_demanded': round(float(stats['total_demanded']), 2),
+            'total_delivered': round(float(stats['total_delivered']), 2),
+            'total_shortage': round(float(stats.get('total_shortage', 0)), 2),
+            'delivery_ratio': round(float(stats['delivery_ratio']), 1)
+        },
+        'requests': requests,
+        'edges': edges
+    })
+    
+    os.makedirs(os.path.dirname(filename) if os.path.dirname(filename) else '.', exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+    print(f"✓ Результаты ({source_type}) сохранены в {filename}")
+
+
+def visualize_and_save(graph, train_cfg, edge_loads, directed_flows,
+                       total_demanded, total_delivered, flows_data, source_type,
+                       html_filename, json_filename,
+                       source_delivery, consumer_receipt):
+    """
+    Единая функция для визуализации и сохранения результатов.
+    """
+    # Строим список заявок для JSON
+    requests_list = []
+    for source, consumers in flows_data.items():
+        for consumer, demand in consumers.items():
+            delivered = source_delivery.get(source, {}).get(consumer, 0.0)
+            requests_list.append({
+                'source': source,
+                'consumer': consumer,
+                'demanded': round(demand, 2),
+                'delivered': round(delivered, 2),
+                'shortage': round(demand - delivered, 2),
+                'delivery_pct': round(delivered / demand * 100, 1) if demand > 0 else 0
+            })
+    
+    edges = _build_edges_from_loads(edge_loads)
+    
+    view = GraphView(graph)
+    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
+
+    view.draw_with_directed_flows(
+        edge_loads=edge_loads,
+        directed_flows=directed_flows,
+        filename=html_filename,
+        title=f"{'ML-предсказание' if source_type == 'ML' else 'Результат точного расчёта (солвер)'} потоков",
+        total_demanded=total_demanded,
+        total_delivered=total_delivered,
+        flows_data=flows_data,
+        source_delivery=source_delivery,
+        consumer_receipt=consumer_receipt
+    )
+
+    stats = {
+        'total_demanded': float(total_demanded),
+        'total_delivered': float(total_delivered),
+        'total_shortage': float(total_demanded - total_delivered),
+        'delivery_ratio': float(total_delivered / total_demanded * 100) if total_demanded > 0 else 0.0
+    }
+    
+    save_flow_results(stats, requests_list, edges, source_type, json_filename)
+
+
+# ============================================================================
+#  Вспомогательные функции
+# ============================================================================
 
 def print_results(results, extractor):
     print(f"Заявлено: {results['demanded']:.1f} кВт")
@@ -21,7 +185,6 @@ def print_results(results, extractor):
     if results['demanded'] > 0:
         print(f"Процент доставки: {100 * results['total_delivered'] / results['demanded']:.1f}%")
     
-    # Средняя доля потерь (вес фиктивного пути)
     if 'loss_weights' in results:
         mean_loss = results['loss_weights'].mean()
         print(f"Средняя доля потерь (фиктивный путь): {mean_loss:.3f}")
@@ -48,11 +211,73 @@ def print_results(results, extractor):
                 print(f"  - {edge.nodes[0].name} ↔ {edge.nodes[1].name}: "
                       f"{flow:.1f} / {cap:.1f} кВт ({util:.1f}%)")
 
+
+def _build_directed_flows_from_ml(results, extractor, registry):
+    """Строит направленные потоки из ML-результатов."""
+    directed_flows = {}
+    for s_idx in range(extractor.S):
+        for c_idx in range(extractor.C):
+            for p_idx in range(extractor.max_paths):
+                flow = results['path_flows'][s_idx, c_idx, p_idx]
+                if flow > 0:
+                    request = None
+                    for req in registry.requests:
+                        if (extractor.source_to_idx.get(req.source.name) == s_idx and 
+                            extractor.consumer_to_idx.get(req.consumer.name) == c_idx):
+                            request = req
+                            break
+                    if request and p_idx < len(request.paths):
+                        path = request.paths[p_idx]
+                        current = request.source
+                        for edge in path:
+                            next_node = edge.nodes[1] if edge.nodes[0] == current else edge.nodes[0]
+                            key = (current.name, next_node.name)
+                            directed_flows[key] = directed_flows.get(key, 0.0) + float(flow)
+                            current = next_node
+    return directed_flows
+
+
+def _build_edge_loads_from_ml(results, extractor):
+    """Строит edge_loads из ML-результатов."""
+    edge_loads = {}
+    for i, edge in enumerate(extractor.edges):
+        edge_loads[edge] = (float(results['edge_flows'][i]), float(results['edge_utilization'][i]))
+    return edge_loads
+
+def _build_source_consumer_from_ml(results, extractor, registry, flows_data):
+    """
+    Строит точные доставки из ML-результатов.
+    """
+    source_delivery = defaultdict(lambda: defaultdict(float))
+    consumer_receipt = defaultdict(lambda: defaultdict(float))
+    
+    for source, consumers in flows_data.items():
+        if source not in extractor.source_to_idx:
+            continue
+        s_idx = extractor.source_to_idx[source]
+        
+        for consumer, demand in consumers.items():
+            if consumer not in extractor.consumer_to_idx:
+                continue
+            c_idx = extractor.consumer_to_idx[consumer]
+            
+            # Суммируем все потоки по путям для этой пары
+            total_flow = float(results['path_flows'][s_idx, c_idx, :].sum())
+            
+            source_delivery[source][consumer] = total_flow
+            consumer_receipt[consumer][source] = total_flow
+    
+    return dict(source_delivery), dict(consumer_receipt)
+
+
+# ============================================================================
+#  Основные функции режимов
+# ============================================================================
+
 def run_training(graph, registry, run_cfg, train_cfg):
     extractor = FeatureExtractor(graph, registry)
     path_mask = extractor.create_path_mask()
 
-    # Генерация данных
     generator = DataGenerator(
         feature_dim=extractor.feature_dim,
         sources=[s.name for s in extractor.sources],
@@ -66,7 +291,6 @@ def run_training(graph, registry, run_cfg, train_cfg):
     )
     train_features, capacity_masks = extractor.normalize_features(raw_features)
 
-    # Матрицы заявок
     S, C = extractor.S, extractor.C
     demands = np.zeros((len(scenarios), S, C), dtype=np.float32)
     for i, flows in enumerate(scenarios):
@@ -109,7 +333,6 @@ def run_training(graph, registry, run_cfg, train_cfg):
         min_delta=train_cfg.get('training.min_delta', 1e-6)
     )
 
-    # Графики
     trainer.plot_loss_curves(
         filename=f"{train_cfg.paths.generated_folder}/loss_curves.png"
     )
@@ -118,14 +341,13 @@ def run_training(graph, registry, run_cfg, train_cfg):
     )
 
     os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
-
-    # Сохранение модели
     torch.save({
         'model_state_dict': model.state_dict(),
         'feature_dim': extractor.feature_dim,
         'output_shape': extractor.get_output_shape(),
         'path_mask': path_mask
     }, f"{train_cfg.paths.generated_folder}/{train_cfg.paths.model_save_name}")
+
 
 def run_prediction(graph, registry, run_cfg, train_cfg):
     with open(f"settings/{run_cfg.flows_file}") as f:
@@ -151,55 +373,32 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
     results = predictor.predict_with_normalized(real_feat, base_flows, real_mask)
 
     print_results(results, extractor)
+
+    source_delivery, consumer_receipt = _build_source_consumer_from_ml(
+            results, extractor, registry, base_flows
+        )
     
     if run_cfg.visualize_flows:
-        # Подготовка данных для draw_with_directed_flows
-        edge_flows = results['edge_flows']
-        edge_capacities = extractor.get_edge_capacities()
-        edge_utils = results['edge_utilization']
+        edge_loads = _build_edge_loads_from_ml(results, extractor)
+        directed_flows = _build_directed_flows_from_ml(results, extractor, registry)
         
-        edge_loads = {}
-        for i, edge in enumerate(extractor.edges):
-            ratio = edge_utils[i]
-            load = (float(edge_flows[i]), float(ratio))
-            edge_loads[edge] = load
-        
-        # Направленные потоки из path_flows
-        directed_flows = {}
-        for s_idx in range(extractor.S):
-            for c_idx in range(extractor.C):
-                for p_idx in range(extractor.max_paths):
-                    flow = results['path_flows'][s_idx, c_idx, p_idx]
-                    if flow > 0:
-                        request = None
-                        for req in registry.requests:
-                            if (extractor.source_to_idx.get(req.source.name) == s_idx and 
-                                extractor.consumer_to_idx.get(req.consumer.name) == c_idx):
-                                request = req
-                                break
-                        if request and p_idx < len(request.paths):
-                            path = request.paths[p_idx]
-                            current = request.source
-                            for edge in path:
-                                next_node = edge.nodes[1] if edge.nodes[0] == current else edge.nodes[0]
-                                key = (current.name, next_node.name)
-                                directed_flows[key] = directed_flows.get(key, 0.0) + float(flow)
-                                current = next_node
-        
-        view = GraphView(graph)
-        view.draw_with_directed_flows(
-            edge_loads, 
-            directed_flows, 
-            filename=f"{train_cfg.paths.generated_folder}/ml-graph.html",
-            title="Предсказание ML-модели",
+        visualize_and_save(
+            graph=graph,
+            train_cfg=train_cfg,
+            edge_loads=edge_loads,
+            directed_flows=directed_flows,
             total_demanded=results['demanded'],
-            total_delivered=results['total_delivered']
+            total_delivered=results['total_delivered'],
+            flows_data=base_flows,
+            source_type='ML',
+            html_filename=f"{train_cfg.paths.generated_folder}/ml_prediction.html",
+            json_filename=f"{train_cfg.paths.generated_folder}/ml_results.json",
+            source_delivery=source_delivery,
+            consumer_receipt=consumer_receipt
         )
 
+
 def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
-    """Запуск солвера с опциональным ML-начальным приближением"""
-    
-    # Загружаем заявки
     with open(f"settings/{run_cfg.flows_file}") as f:
         base_flows = json.load(f)
 
@@ -209,7 +408,6 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # Инициализация начальных потоков
     if run_cfg.get('use_ml_initial_guess', False):
         print("\nЗагрузка ML модели для начального приближения")
         checkpoint = torch.load(run_cfg.model_path, map_location=device, weights_only=False)
@@ -223,18 +421,15 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         model.set_path_mask(checkpoint['path_mask'])
         model.to(device).eval()
 
-        # Получаем нормализованные признаки реальных данных
         raw_real = extractor.build_raw_features(base_flows)
         real_feat, real_mask = extractor.normalize_features(raw_real)
         features_tensor = torch.from_numpy(real_feat).unsqueeze(0).float().to(device)
 
         with torch.no_grad():
-            weights = model(features_tensor)[0].cpu().numpy()  # (S, C, max_paths)
+            weights = model(features_tensor)[0].cpu().numpy()
 
-        # Используем только реальные пути (без фиктивного)
         real_weights = weights[:, :, :extractor.max_paths]
 
-        # Переносим веса в FlowInstance
         for inst in instances:
             s_name = inst.request.source.name
             c_name = inst.request.consumer.name
@@ -257,16 +452,10 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
         print("✓ Начальное приближение от ML установлено.")
     else:
         print("!! Используется равномерное начальное распределение !!")
-        
         for inst in instances:
             inst.set_uniform_flow()
-        
-        total_uniform = sum(inst.get_total_flow() for inst in instances)
-        total_target = sum(inst.target_amount for inst in instances)
-        print(f" Равномерное распределение: {total_uniform:.2f} / {total_target:.2f} кВт")
 
-    # Запуск солвера
-    print(" Запуск градиентного спуска: ")
+    print("Запуск градиентного спуска:")
     
     solver_cfg = train_cfg.solver
     solver = Solver(
@@ -283,64 +472,50 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     result = solver.optimize()
 
     if not result['success']:
-        print(" !!! Ошибка оптимизации:", result.get('message'))
-        return None
+        print("!!! Ошибка оптимизации:", result.get('message'))
+        return None, None
 
-    print(" \n Результаты оптимизации:")
-    print(f"  Итераций: {result['iterations']}")
-    print(f"  Финальный loss: {result['final_loss']:.2f} кВт")
-    print(f"  Недопоставка: {result['total_shortage']:.2f} кВт")
-    print(f"  Превышение capacity: {result['capacity_violation']:.2f} кВт")
+    print(f"\nИтераций: {result['iterations']}")
+    print(f"Финальный loss: {result['final_loss']:.2f} кВт")
+    print(f"Недопоставка: {result['total_shortage']:.2f} кВт")
+    print(f"Превышение capacity: {result['capacity_violation']:.2f} кВт")
 
-    # Отчёт о доставке
-    print(" \n Отчет о доставке энергии: ")
-    
     delivery = solver.get_delivery_report()
-    print(f"Всего заявлено: {delivery['total_requested']:.2f} кВт")
+    print(f"\nВсего заявлено: {delivery['total_requested']:.2f} кВт")
     print(f"Доставлено: {delivery['total_delivered']:.2f} кВт")
     print(f"Недопоставлено: {delivery['total_shortage']:.2f} кВт "
           f"({delivery['total_shortage']/delivery['total_requested']*100:.2f}%)")
-    
-    print("\nДетали по заявкам (первые 10):")
-    for i, item in enumerate(delivery['items'][:10]):
-        status = "+" if item['shortage'] < 0.01 else f"- -{item['shortage']:.1f}"
-        print(f"  {i+1:2d}. {item['source']} → {item['consumer']}: "
-              f"{item['delivered']:.1f} / {item['requested']:.1f} кВт {status}")
-    if len(delivery['items']) > 10:
-        print(f"  ... и ещё {len(delivery['items'])-10} заявок")
 
-    # Отчёт о нарушениях пропускной способности
-    print(" !! Нарушения пропускной способности: ")
-    
+    source_delivery, consumer_receipt = solver.get_source_consumer_delivery()
+
     violations = solver.get_edge_violations()
     if violations:
-        print(f" Рёбер с превышением: {len(violations)}")
+        print(f"\nРёбер с превышением: {len(violations)}")
         for v in violations[:10]:
             print(f"  {v['edge']}: {v['actual_flow']:.2f} / {v['capacity']:.2f} кВт "
                   f"(+{v['excess']:.2f}, {v['excess_pct']:.1f}%)")
-        if len(violations) > 10:
-            print(f"  ... и ещё {len(violations)-10}")
     else:
-        print(" Нет рёбер с превышением пропускной способности")
+        print("\nНет рёбер с превышением пропускной способности")
 
-    # Сравнение с ML-приближением (если использовалось)
-    if run_cfg.use_ml_initial_guess:
-        print("Сравнение с ML-приближением:")
-        print(f"  Улучшение недопоставки: {result['total_shortage']:.2f} кВт (солвер уточнил)")
-
-    os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
-    # Визуализация
     if run_cfg.visualize_flows:
-        os.makedirs(train_cfg.paths.generated_folder, exist_ok=True)
-        print("Визуализация решения:")
-        view = GraphView(graph)
         edge_loads = solver.get_edge_loads()
         directed_flows = solver.get_directed_edge_flows()
         
-        output_path = f"{train_cfg.paths.generated_folder}/solution_graph.html"
-        view.draw_with_directed_flows(edge_loads, directed_flows, filename=output_path)
+        visualize_and_save(
+            graph=graph,
+            train_cfg=train_cfg,
+            edge_loads=edge_loads,
+            directed_flows=directed_flows,
+            total_demanded=delivery['total_requested'],
+            total_delivered=delivery['total_delivered'],
+            flows_data=base_flows,
+            source_type='Solver',
+            html_filename=f"{train_cfg.paths.generated_folder}/solution_graph.html",
+            json_filename=f"{train_cfg.paths.generated_folder}/solver_results.json",
+            source_delivery=source_delivery,
+            consumer_receipt=consumer_receipt
+        )
     
-    # График обучения солвера
     solver.plot_training_history(
         filename=f"{train_cfg.paths.generated_folder}/solver_history.png"
     )
