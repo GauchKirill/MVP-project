@@ -194,7 +194,21 @@ def run_prediction(graph, registry, run_cfg, train_cfg):
             total_delivered=results['total_delivered'],
             flows_data=base_flows  # ← добавить
         )
-        print(f"✓ Граф ML-предсказания сохранён в {train_cfg.paths.generated_folder}/ml_prediction.html")
+
+    # Сохранение результатов
+    requests = _build_requests_from_ml(results, extractor, registry, base_flows)
+    edges = _build_edges_from_ml(results, extractor)
+    stats = {
+        'total_demanded': results['demanded'],
+        'total_delivered': results['total_delivered'],
+        'total_shortage': results['demanded'] - results['total_delivered'],
+        'delivery_ratio': (results['total_delivered'] / results['demanded'] * 100) if results['demanded'] > 0 else 0
+    }
+    save_flow_results(
+        stats, requests, edges,
+        source_type='ML',
+        filename=f"{train_cfg.paths.generated_folder}/ml_results.json"
+    )
 
 def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     """Запуск солвера с опциональным ML-начальным приближением"""
@@ -323,6 +337,21 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     else:
         print(" Нет рёбер с превышением пропускной способности")
 
+    # Сохранение результатов
+    requests = _build_requests_from_solver(solver)
+    edges = _build_edges_from_solver(solver)
+    stats = {
+        'total_demanded': delivery['total_requested'],
+        'total_delivered': delivery['total_delivered'],
+        'total_shortage': delivery['total_shortage'],
+        'delivery_ratio': delivery['delivery_ratio'] * 100
+    }
+    save_flow_results(
+        stats, requests, edges,
+        source_type='Solver',
+        filename=f"{train_cfg.paths.generated_folder}/solver_results.json"
+    )
+
     # Сравнение с ML-приближением (если использовалось)
     if run_cfg.use_ml_initial_guess:
         print("Сравнение с ML-приближением:")
@@ -355,3 +384,148 @@ def run_solver_pipeline(graph, registry, run_cfg, train_cfg):
     )
 
     return result, solver
+
+def _build_requests_from_ml(results, extractor, registry, flows):
+    """Преобразует ML-результаты в список заявок."""
+    requests_list = []
+    for s_name, consumers in flows.items():
+        if s_name not in extractor.source_to_idx:
+            continue
+        s_idx = extractor.source_to_idx[s_name]
+        for c_name, demand in consumers.items():
+            if c_name not in extractor.consumer_to_idx:
+                continue
+            c_idx = extractor.consumer_to_idx[c_name]
+            
+            request = None
+            for req in registry.requests:
+                if req.source.name == s_name and req.consumer.name == c_name:
+                    request = req
+                    break
+            
+            if request and s_idx < results['path_flows'].shape[0] and c_idx < results['path_flows'].shape[1]:
+                total_flow = 0.0
+                paths_info = []
+                for p_idx, path in enumerate(request.paths):
+                    if p_idx < results['path_flows'].shape[2]:
+                        flow = float(results['path_flows'][s_idx, c_idx, p_idx])
+                        if flow > 0.001:
+                            route_names = [request.source.name]
+                            current = request.source
+                            for edge in path:
+                                next_node = edge.nodes[1] if edge.nodes[0] == current else edge.nodes[0]
+                                route_names.append(next_node.name)
+                                current = next_node
+                            paths_info.append({
+                                'route': ' → '.join(route_names),
+                                'flow': round(flow, 2)
+                            })
+                            total_flow += flow
+                requests_list.append({
+                    'source': s_name,
+                    'consumer': c_name,
+                    'demanded': round(demand, 2),
+                    'delivered': round(total_flow, 2),
+                    'shortage': round(demand - total_flow, 2),
+                    'paths': paths_info
+                })
+    return requests_list
+
+
+def _build_requests_from_solver(solver):
+    """Преобразует результаты солвера в список заявок."""
+    requests_list = []
+    for inst in solver.instances:
+        total_flow = 0.0
+        paths_info = []
+        for path in inst.get_paths():
+            flow = inst.path_flows.get(inst._path_to_key(path), 0.0)
+            if flow > 0.001:
+                route_names = [inst.request.source.name]
+                current = inst.request.source
+                for edge in path:
+                    next_node = edge.nodes[1] if edge.nodes[0] == current else edge.nodes[0]
+                    route_names.append(next_node.name)
+                    current = next_node
+                paths_info.append({
+                    'route': ' → '.join(route_names),
+                    'flow': round(flow, 2)
+                })
+                total_flow += flow
+        requests_list.append({
+            'source': inst.request.source.name,
+            'consumer': inst.request.consumer.name,
+            'demanded': round(inst.target_amount, 2),
+            'delivered': round(total_flow, 2),
+            'shortage': round(inst.target_amount - total_flow, 2),
+            'paths': paths_info
+        })
+    return requests_list
+
+
+def _build_edges_from_ml(results, extractor):
+    """Преобразует ML-результаты в список рёбер."""
+    edges_list = []
+    edge_flows = results.get('edge_flows', [])
+    edge_utils = results.get('edge_utilization', [])
+    for i, edge in enumerate(extractor.edges):
+        cap = edge.capacity if edge.capacity != float('inf') else float('inf')
+        flow = float(edge_flows[i]) if i < len(edge_flows) else 0.0
+        util = float(edge_utils[i]) * 100 if i < len(edge_utils) else 0.0
+        edges_list.append({
+            'edge': f"{edge.nodes[0].name} ↔ {edge.nodes[1].name}",
+            'capacity': 'inf' if cap == float('inf') else round(cap, 2),
+            'flow': round(flow, 2),
+            'utilization': round(util, 1)
+        })
+    return edges_list
+
+
+def _build_edges_from_solver(solver):
+    """Преобразует результаты солвера в список рёбер."""
+    edges_list = []
+    edge_loads = solver.get_edge_loads()
+    for edge, (flow, ratio) in edge_loads.items():
+        cap = edge.capacity if edge.capacity != float('inf') else float('inf')
+        edges_list.append({
+            'edge': f"{edge.nodes[0].name} ↔ {edge.nodes[1].name}",
+            'capacity': 'inf' if cap == float('inf') else round(cap, 2),
+            'flow': round(flow, 2),
+            'utilization': round(ratio * 100, 1)
+        })
+    return edges_list
+
+
+def save_flow_results(stats, requests, edges, source_type, filename):
+    """
+    Сохраняет результаты потокораспределения в JSON.
+    """
+    def convert(obj):
+        """Рекурсивно преобразует numpy-типы в Python-типы."""
+        import numpy as np
+        if isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, dict):
+            return {k: convert(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert(item) for item in obj]
+        return obj
+    
+    report = convert({
+        'source': source_type,
+        'summary': {
+            'total_demanded': round(float(stats['total_demanded']), 2),
+            'total_delivered': round(float(stats['total_delivered']), 2),
+            'total_shortage': round(float(stats.get('total_shortage', 0)), 2),
+            'delivery_ratio': round(float(stats['delivery_ratio']), 1)
+        },
+        'requests': requests,
+        'edges': edges
+    })
+    
+    os.makedirs(os.path.dirname(filename) if os.path.dirname(filename) else '.', exist_ok=True)
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+    print(f"✓ Результаты ({source_type}) сохранены в {filename}")

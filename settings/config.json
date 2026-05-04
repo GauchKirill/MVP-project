@@ -30,8 +30,8 @@
     "capacity_weight": 1.8
   },
   "solver": {
-    "learning_rate": 0.3,
-    "max_iter": 5000,
+    "learning_rate": 0.6,
+    "max_iter": 3000,
     "epsilon": 0.0001,
     "early_stopping_patience": 20,
     "gradient_epsilon_rel": 0.01,
