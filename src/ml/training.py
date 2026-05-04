@@ -92,7 +92,7 @@ class ModelTrainer:
         best_model_state = None
         
         # Главный прогресс-бар по эпохам
-        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха")
+        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха", ncols=120)
         
         for epoch in epoch_pbar:
             self.model.train()
@@ -155,7 +155,11 @@ class ModelTrainer:
         total_components = {}
         num_batches = 0
         
-        for batch_idx, (batch_features, batch_demands) in enumerate(loader):
+        # Прогресс-бар для батчей
+        desc = "Train" if training else "Val"
+        batch_pbar = tqdm(loader, desc=desc, leave=False, unit="batch", ncols=100)
+        
+        for batch_idx, (batch_features, batch_demands) in enumerate(batch_pbar):
             batch_features = batch_features.to(self.device)
             batch_demands = batch_demands.to(self.device)
             
@@ -192,6 +196,16 @@ class ModelTrainer:
             for key, value in components.items():
                 total_components[key] = total_components.get(key, 0.0) + value
             num_batches += 1
+            
+            # Обновляем прогресс-бар батчей
+            batch_pbar.set_postfix({
+                'loss': f'{loss.item():.4e}',
+                'cap': f'{components.get("capacity", 0):.4e}',
+                'dem': f'{components.get("demand", 0):.4e}',
+                'over': f'{components.get("overloaded", 0):.0f}'
+            })
+        
+        batch_pbar.close()
         
         return total_loss / num_batches, {k: v / num_batches for k, v in total_components.items()}
 

@@ -3,6 +3,7 @@ from typing import List, Dict, Tuple
 from graph import Edge, Graph
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from collections import defaultdict
 
 from .flow_instance import FlowInstance
 
@@ -611,3 +612,20 @@ class Solver:
                     break
         
         return directed
+    
+    def get_source_consumer_delivery(self) -> Tuple[Dict, Dict]:
+        """
+        Возвращает точные доставки от источников к потребителям.
+        """
+        source_delivery = defaultdict(lambda: defaultdict(float))
+        consumer_receipt = defaultdict(lambda: defaultdict(float))
+        
+        for inst in self.instances:
+            source = inst.request.source.name
+            consumer = inst.request.consumer.name
+            total_flow = inst.get_total_flow()
+            
+            source_delivery[source][consumer] += total_flow
+            consumer_receipt[consumer][source] += total_flow
+        
+        return dict(source_delivery), dict(consumer_receipt)
