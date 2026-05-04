@@ -222,15 +222,15 @@ class GraphView:
                 from_node, to_node = v, u
             
             if ratio > 1.0:
-                color = '#e74c3c'
+                color = '#8B0000'       # бордовый — критическое >100%
+            elif ratio > 0.95:
+                color = '#e74c3c'       # красный — предельное 95-100%
             elif ratio > 0.8:
-                color = '#f39c12'
-            elif ratio > 0.5:
-                color = '#f1c40f'
-            elif ratio > 0.1:
-                color = '#2ecc71'
+                color = '#f39c12'       # оранжевый — высокое 80-95%
+            elif ratio > 0.6:
+                color = '#f1c40f'       # жёлтый — среднее 60-80%
             else:
-                color = '#bdc3c7'
+                color = '#2ecc71'       # зелёный — низкое <60%
             
             width = max(2, min(ratio * 8, 10))
             cap_str = "∞" if cap == float('inf') else f"{cap:.1f}"
@@ -275,10 +275,10 @@ class GraphView:
             """
         
         overloaded = sum(1 for _, r in edge_loads.values() if r > 1.0)
-        high_load = sum(1 for _, r in edge_loads.values() if 0.8 < r <= 1.0)
-        medium_load = sum(1 for _, r in edge_loads.values() if 0.5 < r <= 0.8)
-        low_load = sum(1 for _, r in edge_loads.values() if 0.1 < r <= 0.5)
-        no_load = sum(1 for _, r in edge_loads.values() if r <= 0.1)
+        critical_load = sum(1 for _, r in edge_loads.values() if 0.95 < r <= 1.0)
+        high_load = sum(1 for _, r in edge_loads.values() if 0.8 < r <= 0.95)
+        medium_load = sum(1 for _, r in edge_loads.values() if 0.6 < r <= 0.8)
+        low_load = sum(1 for _, r in edge_loads.values() if r <= 0.6)
         
         legend = f"""
         <div style="position: absolute; top: 10px; right: 10px; background: white;
@@ -291,11 +291,11 @@ class GraphView:
             {stats_html}
             
             <b>Загрузка рёбер:</b><br>
-            <span style="color:#e74c3c;">■ Критическая &gt;100%</span>: {overloaded}<br>
-            <span style="color:#f39c12;">■ Высокая 80-100%</span>: {high_load}<br>
-            <span style="color:#f1c40f;">■ Средняя 50-80%</span>: {medium_load}<br>
-            <span style="color:#2ecc71;">■ Низкая 10-50%</span>: {low_load}<br>
-            <span style="color:#bdc3c7;">■ Минимальная &lt;10%</span>: {no_load}<br><br>
+            <span style="color:#8B0000;">■ Критическое &gt;100%</span>: {overloaded}<br>
+            <span style="color:#e74c3c;">■ Предельное 95-100%</span>: {critical_load}<br>
+            <span style="color:#f39c12;">■ Высокое 80-95%</span>: {high_load}<br>
+            <span style="color:#f1c40f;">■ Среднее 60-80%</span>: {medium_load}<br>
+            <span style="color:#2ecc71;">■ Низкое &lt;60%</span>: {low_load}<br><br>
             
             <b>Типы узлов:</b><br>
             <span style="color:#e74c3c;">▲ Источник</span><br>

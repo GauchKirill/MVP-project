@@ -11,9 +11,8 @@ from .loss import EdgeFlowCalculator, PowerFlowLoss
 from .inference import FlowPredictor
 from .training import ModelTrainer
 from .data_generator import DataGenerator
-from graph import Graph, GraphView, RequestRegistry
-from solver import FlowsCreator, Solver, FlowInstance
-from .visualization import FlowVisualizer
+from graph import GraphView
+from solver import FlowsCreator, Solver
 
 def print_results(results, extractor):
     print(f"Заявлено: {results['demanded']:.1f} кВт")

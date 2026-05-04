@@ -1,22 +1,19 @@
 {
   "training": {
-    "num_samples_per_level": 200,
+    "num_samples_per_level": 400,
     "sparsity_levels": [
-      0.1,
       0.3,
-      0.5,
-      0.7,
-      0.9
+      0.7
     ],
     "demand_scale_factors": [
       0.02,
       0.04
     ],
-    "batch_size": 256,
+    "batch_size": 64,
     "epochs": 30,
-    "learning_rate": 0.0001,
+    "learning_rate": 1e-4,
     "early_stopping_patience": 10,
-    "min_delta": 0.001,
+    "min_delta": 0.0001,
     "gradient_epsilon_rel": 0.01
   },
   "model": {
@@ -28,14 +25,14 @@
     "dropout_rate": 0.3
   },
   "loss": {
-    "demand_weight": 30.0,
+    "demand_weight": 15.0,
     "excess_weight": 1.5,
     "capacity_weight": 1.8
   },
   "solver": {
-    "learning_rate": 0.1,
-    "max_iter": 400,
-    "epsilon": 0.001,
+    "learning_rate": 0.3,
+    "max_iter": 5000,
+    "epsilon": 0.0001,
     "early_stopping_patience": 20,
     "gradient_epsilon_rel": 0.01,
     "capacity_weight": 1.8,

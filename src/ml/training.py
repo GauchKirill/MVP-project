@@ -91,19 +91,20 @@ class ModelTrainer:
         patience_counter = 0
         best_model_state = None
         
-        for epoch in range(epochs):
+        # Главный прогресс-бар по эпохам
+        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха")
+        
+        for epoch in epoch_pbar:
             self.model.train()
             train_loss, train_components = self._run_epoch(
-                train_loader, train_capacity_masks, training=True, 
-                desc=f"Train эпоха {epoch+1}/{epochs}"
+                train_loader, train_capacity_masks, training=True
             )
             
             if val_loader is not None:
                 self.model.eval()
                 with torch.no_grad():
                     val_loss, val_components = self._run_epoch(
-                        val_loader, val_capacity_masks, training=False,
-                        desc=f"Val эпоха {epoch+1}/{epochs}"
+                        val_loader, val_capacity_masks, training=False
                     )
             else:
                 val_loss = train_loss
@@ -125,11 +126,23 @@ class ModelTrainer:
             else:
                 patience_counter += 1
             
-            if verbose:
-                self._log_epoch(epoch, train_loss, val_loss, train_components)
-
+            # Обновляем прогресс-бар
+            epoch_pbar.set_postfix({
+                'train': f'{train_loss:.4e}',
+                'val': f'{val_loss:.4e}',
+                'best': f'{best_val_loss:.4e}',
+                'cap': f'{train_components.get("capacity", 0):.4e}',
+                'dem': f'{train_components.get("demand", 0):.4e}',
+                'pat': f'{patience_counter}/{early_stopping_patience}'
+            })
+            
             if patience_counter >= early_stopping_patience:
+                epoch_pbar.write(f"\nРанняя остановка на эпохе {epoch}: "
+                               f"val_loss не улучшался {early_stopping_patience} эпох "
+                               f"(лучший val_loss = {best_val_loss:.6e})")
                 break
+        
+        epoch_pbar.close()
         
         if best_model_state is not None:
             self.model.load_state_dict(best_model_state)
@@ -137,17 +150,12 @@ class ModelTrainer:
         return self.history
 
     def _run_epoch(self, loader: DataLoader, capacity_masks: np.ndarray, 
-                   training: bool = True, desc: str = ""):
+                   training: bool = True):
         total_loss = 0.0
         total_components = {}
         num_batches = 0
         
-        # Оборачиваем loader в tqdm для отображения прогресса батчей
-        # desc меняется в зависимости от режима (train/val)
-        desc = "Training" if training else "Validation"
-        progress_bar = tqdm(loader, desc=desc, leave=False, unit="batch")
-        
-        for batch_idx, (batch_features, batch_demands) in enumerate(progress_bar):
+        for batch_idx, (batch_features, batch_demands) in enumerate(loader):
             batch_features = batch_features.to(self.device)
             batch_demands = batch_demands.to(self.device)
             
@@ -184,14 +192,6 @@ class ModelTrainer:
             for key, value in components.items():
                 total_components[key] = total_components.get(key, 0.0) + value
             num_batches += 1
-            
-            # Обновляем описание прогресс-бара текущими метриками
-            progress_bar.set_postfix({
-                'loss': f'{loss.item():.4e}',
-                'cap': f'{components.get("capacity", 0):.4e}',
-                'dem': f'{components.get("demand", 0):.4e}',
-                'over': f'{components.get("overloaded", 0):.0f}'
-            })
         
         return total_loss / num_batches, {k: v / num_batches for k, v in total_components.items()}
 
