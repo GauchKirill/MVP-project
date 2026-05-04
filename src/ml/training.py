@@ -92,7 +92,7 @@ class ModelTrainer:
         best_model_state = None
         
         # Главный прогресс-бар по эпохам
-        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха", ncols=1200)
+        epoch_pbar = tqdm(range(epochs), desc="Обучение", unit="эпоха", ncols=200)
         
         for epoch in epoch_pbar:
             self.model.train()
@@ -157,7 +157,7 @@ class ModelTrainer:
         
         # Прогресс-бар для батчей
         desc = "Train" if training else "Val"
-        batch_pbar = tqdm(loader, desc=desc, leave=False, unit="batch", ncols=1000)
+        batch_pbar = tqdm(loader, desc=desc, leave=False, unit="batch", ncols=200)
         
         for batch_idx, (batch_features, batch_demands) in enumerate(batch_pbar):
             batch_features = batch_features.to(self.device)

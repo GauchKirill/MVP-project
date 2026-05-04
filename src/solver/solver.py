@@ -336,7 +336,7 @@ class Solver:
         patience_counter = 0
 
         # Прогресс-бар
-        pbar = tqdm(range(self.max_iter), desc="Решатель", unit="iter")
+        pbar = tqdm(range(self.max_iter), desc="Решатель", unit="iter", ncols=200)
         
         for iteration in pbar:
             loss, components = self.compute_loss()

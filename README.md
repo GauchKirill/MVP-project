@@ -123,9 +123,7 @@
 ```
 
 * Ключи верхнего уровня — источники (A-Z)
-
 * Ключи второго уровня — потребители
-
 * Значения — требуемая мощность в кВт
 
 ## Генерируемые файлы
@@ -195,3 +193,251 @@
 | Оранжевый | `#f39c12` | 80-95% | Высокое |
 | Жёлтый | `#f1c40f` | 60-80% | Среднее |
 | Зелёный | `#2ecc71` | <60% | Низкое |
+
+## Конфигурация `run_config.json`
+
+### Поля `run_config.json`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `edges_file` | string | `"edges.json"` | Имя файла с рёбрами графа в папке `settings/` |
+| `flows_file` | string | `"flows.json"` | Имя файла с заявками в папке `settings/` |
+| `mode` | string | — | Режим работы: `"train"`, `"predict"`, `"solve"` |
+| `use_ml_initial_guess` | bool | `true` | Использовать ML-модель как начальное приближение для солвера |
+| `model_path` | string | `"genereted/model.pt"` | Путь к сохранённой модели (для режимов `predict` и `solve`) |
+| `visualize_flows` | bool | `true` | Создавать ли интерактивный HTML-граф с потоками |
+
+
+### Выбор режима
+
+Режим работы задаётся в `settings/run_config.json` полем `mode`:
+
+```json
+{
+  "mode": "train"
+}
+```
+
+### Поле `mode`
+
+| Значение | Режим | Описание |
+|----------|-------|----------|
+| `"train"` | Обучение ML | Генерация данных, обучение нейросети, сохранение модели |
+| `"predict"` | Предсказание ML | Загрузка модели и предсказание потоков |
+| `"solve"` | Точный расчёт | Запуск солвера (опционально с ML-началом) |
+
+
+#### Режим `"train"`
+
+```json
+{
+  "edges_file": "edges.json",
+  "flows_file": "flows.json",
+  "mode": "train",
+  "visualize_flows": true
+}
+```
+
+Что произойдёт:
+
+1. Генерация синтетических данных согласно config.json → training
+2. Обучение модели PathWeightNetwork
+3. Сохранение model.pt в genereted/
+4. Построение графиков: loss_curves.png, loss_components.png
+
+
+#### Режим `"predict"`
+
+```json
+{
+  "edges_file": "edges.json",
+  "flows_file": "flows.json",
+  "mode": "predict",
+  "model_path": "genereted/model.pt",
+  "visualize_flows": true
+}
+```
+
+Что произойдёт:
+
+1. Загрузка модели из model_path
+2. Предсказание потоков для flows.json
+3. Визуализация графа → genereted/ml_prediction.html
+4. Сохранение результатов → genereted/ml_results.json
+
+#### Режим `"solve"`
+
+Что произойдёт:
+
+1. Инициализация потоков (ML-предсказанием или равномерно)
+2. Градиентный спуск с двухэтапным обновлением
+3. Визуализация графа → genereted/solution_graph.html
+4. Сохранение результатов → genereted/solver_results.json
+5. График обучения → genereted/solver_history.png
+
+##### С ML-предсказанием:
+```json
+{
+  "edges_file": "edges.json",
+  "flows_file": "flows.json",
+  "mode": "solve",
+  "use_ml_initial_guess": true,
+  "model_path": "genereted/model.pt",
+  "visualize_flows": true
+}
+```
+
+##### Без Ml-предсказания
+```json
+{
+  "edges_file": "edges.json",
+  "flows_file": "flows.json",
+  "mode": "solve",
+  "use_ml_initial_guess": false,
+  "visualize_flows": true
+}
+```
+
+## Конфигурация `config.json`
+
+### Поля секции `training`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `num_samples_per_level` | int | `1000` | Сэмплов на каждую комбинацию (sparsity × scale) |
+| `sparsity_levels` | list | `[0.1, 0.3, 0.5, 0.7, 0.9]` | Доли рёбер с `inf` в синтетических данных |
+| `demand_scale_factors` | list | `[0.02, 0.04]` | Масштабы заявок относительно пропускной способности |
+| `batch_size` | int | `128` | Размер батча для обучения |
+| `epochs` | int | `200` | Максимальное количество эпох |
+| `learning_rate` | float | `0.001` | Скорость обучения Adam |
+| `early_stopping_patience` | int | `10` | Остановка при отсутствии улучшений N эпох |
+| `min_delta` | float | `0.0001` | Минимальное улучшение для сброса счётчика patience |
+
+Логика генерации данных:
+
+* Для каждой пары (sparsity, scale_factor) генерируется num_samples_per_level сценариев
+* Общее количество = len(sparsity_levels) × len(demand_scale_factors) × num_samples_per_level
+* Например: 5 × 2 × 1000 = 10000 сценариев
+
+### Поля секции `model`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `hidden_dims` | list | `[512, 256, 128]` | Размерности скрытых слоёв энкодера |
+| `dropout_rate` | float | `0.3` | Вероятность dropout между слоями |
+
+Архитектура: Input → Linear+BN+ReLU+Dropout → ... → Output
+
+### Поля секции `loss`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `capacity_weight` | float | `1.0` | Штраф за превышение пропускной способности |
+| `demand_weight` | float | `5.0` | Штраф за недопоставку энергии |
+
+Функция потерь: loss = demand_weight × shortage + capacity_weight × capacity_violation
+
+### Поля секции `solver`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `learning_rate` | float | `0.3` | Скорость обучения градиентного спуска |
+| `max_iter` | int | `1000` | Максимальное количество итераций |
+| `epsilon` | float | `0.0001` | Порог сходимости по изменению loss |
+| `gradient_epsilon_rel` | float | `0.01` | Относительный шаг для конечных разностей |
+| `capacity_weight` | float | `4.0` | Штраф за превышение пропускной способности в loss |
+| `early_stopping_patience` | int | `20` | Остановка при отсутствии улучшений N итераций |
+| `verbose` | bool | `true` | Выводить ли прогресс-бар |
+
+Двухэтапное обновление на каждой итерации:
+
+* Корректировка суммарного потока по заявке
+* Перераспределение между путями без изменения суммарного потока
+
+### Поля секции `paths`
+
+| Поле | Тип | По умолчанию | Описание |
+|------|-----|-------------|----------|
+| `generated_folder` | string | `"genereted"` | Папка для сохранения результатов |
+| `model_save_name` | string | `"model.pt"` | Имя файла обученной модели |
+| `graph_html` | string | `"graph.html"` | Имя файла графа структуры сети |
+
+### Полный пример
+```json
+{
+  "training": {
+    "num_samples_per_level": 1000,
+    "sparsity_levels": [
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8
+    ],
+    "demand_scale_factors": [
+      0.02
+    ],
+    "batch_size": 256,
+    "epochs": 300,
+    "learning_rate": 1e-4,
+    "early_stopping_patience": 20,
+    "min_delta": 1e-5,
+    "gradient_epsilon_rel": 0.01
+  },
+  "model": {
+    "hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "dropout_rate": 0.3
+  },
+  "loss": {
+    "demand_weight": 70.0,
+    "capacity_weight": 1.8
+  },
+  "solver": {
+    "learning_rate": 0.015,
+    "max_iter": 10000,
+    "epsilon": 1e-6,
+    "early_stopping_patience": 30,
+    "gradient_epsilon_rel": 0.005,
+    "capacity_weight": 1.8,
+    "verbose": true
+  },
+  "visualization": {
+    "training": true,
+    "flows": true,
+    "save_report": true,
+    "visualize_data": true
+  },
+  "paths": {
+    "generated_folder": "genereted",
+    "model_save_name": "model.pt",
+    "graph_html": "graph.html"
+  }
+}
+```
+
+## Примеры команд
+
+```bash
+# Обучение модели (при настройках run_config.json согласно "Режим `train`")
+python main.py
+
+# Предсказание с помощью Ml-модели (при настройках run_config.json согласно "Режим `predict`")
+python main.py
+
+# Точный расчёт (при настройках run_config.json согласно "Режим `solve`")
+python main.py
+
+# Просмотр результатов
+ls generated/
+# model.pt  loss_curves.png  loss_components.png  ml_prediction.html
+# solution_graph.html  solver_history.png  ml_results.json  solver_results.json
+
+# Открыть граф в браузере
+xdg-open generated/solution_graph.html
+```
