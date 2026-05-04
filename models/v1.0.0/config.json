@@ -3,21 +3,21 @@
     "num_samples_per_level": 1000,
     "sparsity_levels": [
       0.2,
-      0.3,
       0.4,
-      0.5,
       0.6,
-      0.7,
       0.8
     ],
     "demand_scale_factors": [
-      0.02
+      0.02,
+      0.04,
+      0.08,
+      0.15
     ],
     "batch_size": 256,
-    "epochs": 300,
-    "learning_rate": 1e-4,
-    "early_stopping_patience": 20,
-    "min_delta": 1e-5,
+    "epochs": 200,
+    "learning_rate": 2e-5,
+    "early_stopping_patience": 15,
+    "min_delta": 1e-4,
     "gradient_epsilon_rel": 0.01
   },
   "model": {
@@ -29,14 +29,15 @@
     "dropout_rate": 0.3
   },
   "loss": {
-    "demand_weight": 70.0,
+    "demand_weight": 30.0,
+    "excess_weight": 1.5,
     "capacity_weight": 1.8
   },
   "solver": {
-    "learning_rate": 0.015,
-    "max_iter": 10000,
+    "learning_rate": 0.01,
+    "max_iter": 8000,
     "epsilon": 1e-6,
-    "early_stopping_patience": 30,
+    "early_stopping_patience": 25,
     "gradient_epsilon_rel": 0.005,
     "capacity_weight": 1.8,
     "verbose": true
