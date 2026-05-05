@@ -4,5 +4,5 @@
   "visualize_flows": true,
   "mode": "solve",
   "use_ml_initial_guess": true,
-  "model_path": "models/v1.0.0/genereted/model.pt"
+  "model_path": "models/v1.0/genereted/model.pt"
 }
