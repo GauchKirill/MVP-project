@@ -210,15 +210,27 @@ class ModelTrainer:
         return total_loss / num_batches, {k: v / num_batches for k, v in total_components.items()}
 
     def _log_epoch(self, epoch: int, train_loss: float, val_loss: float,
-                components: Dict[str, float]):
-        print(
-            f"Epoch {epoch:3d} | "
-            f"Train: {train_loss:.4e} | "
-            f"Val: {val_loss:.4e} | "
-            f"cap: {components.get('capacity', 0):.4e} | "
-            f"dem: {components.get('demand', 0):.4e} | "
+               components: Dict[str, float]):
+        """Логирует информацию об эпохе."""
+        comp_str = ", ".join([
+            f"cap: {components.get('capacity', 0):.4e}",
+            f"dem: {components.get('demand', 0):.4e}",
+            f"avg_u: {components.get('avg_util', 0):.4e}",
+            f"max_u: {components.get('max_util', 0):.4e}",
+            f"deliv: {components.get('delivery_ratio', 0):.4e}",
             f"over: {components.get('overloaded', 0):.0f}"
-        )
+        ])
+        print(f"Epoch {epoch:3d} | Train: {train_loss:.4e} | Val: {val_loss:.4e}")
+        print(f"         | {comp_str}")
+        
+        # ЗАПИСЬ ДЛЯ STREAMLIT — абсолютный путь
+        try:
+            epoch_file = os.path.join(os.getcwd(), "genereted", ".epoch")
+            os.makedirs(os.path.dirname(epoch_file), exist_ok=True)
+            with open(epoch_file, "w") as f:
+                f.write(f"{epoch}\n{train_loss:.4e}\n{val_loss:.4e}")
+        except Exception as e:
+            print(f"DEBUG ERROR writing .epoch: {e}")
 
     def plot_loss_components(self, filename="loss_components.png"):
         """Отдельный график с компонентами train_loss"""

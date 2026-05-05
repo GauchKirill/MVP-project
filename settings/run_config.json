@@ -1,6 +1,6 @@
 {
   "edges_file": "edges.json",
   "flows_file": "flows.json",
-  "visualize_flows": true,
-  "mode": "train"
+  "mode": "train",
+  "visualize_flows": false
 }
