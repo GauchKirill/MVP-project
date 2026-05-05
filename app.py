@@ -139,10 +139,9 @@ def main():
                     min_delta = st.number_input("Min delta", 1e-8, 1e-2, 1e-4, format="%.6f", key="min_delta")
             
             with st.expander("Функция потерь", expanded=False):
-                col1, col2, col3 = st.columns(3)
+                col1, col2 = st.columns(2)
                 with col1: demand_weight = st.number_input("demand_weight", 0.1, 1000.0, 10.0, key="demand_w")
-                with col2: excess_weight = st.number_input("excess_weight", 0.1, 100.0, 1.5, key="excess_w")
-                with col3: capacity_weight = st.number_input("capacity_weight", 0.1, 100.0, 1.8, key="capacity_w")
+                with col2: capacity_weight = st.number_input("capacity_weight", 0.1, 100.0, 1.8, key="capacity_w")
         
         # === РЕЖИМ 2: ML-предсказание ===
         elif mode == "ML-предсказание":
@@ -210,7 +209,7 @@ def main():
                 "min_delta": min_delta
             },
             "model": {"hidden_dims": [512, 256, 128], "dropout_rate": 0.3},
-            "loss": {"demand_weight": demand_weight, "excess_weight": excess_weight, "capacity_weight": capacity_weight},
+            "loss": {"demand_weight": demand_weight, "capacity_weight": capacity_weight},
             "paths": {"generated_folder": "genereted", "model_save_name": "model.pt"}
         }
         with open('settings/config.json', 'w', encoding='utf-8') as f: json.dump(config, f, indent=2)

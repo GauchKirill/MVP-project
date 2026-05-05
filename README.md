@@ -59,6 +59,8 @@ MVP-project/
 │       ├── flow_instance.py  # Экземпляр потока
 │       └── flows_creator.py  # Загрузка заявок
 │
+├── models/                   # Папка с наилучшими результатами и файлом config.py к ним 
+│
 └── genereted/                # Выходные файлы
     ├── model.pt              # Сохранённая модель
     ├── loss_curves.png       # График обучения
