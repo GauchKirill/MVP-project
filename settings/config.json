@@ -1,6 +1,6 @@
 {
   "training": {
-    "num_samples_per_level": 1000,
+    "num_samples_per_level": 500,
     "sparsity_levels": [
       0.2,
       0.35,
@@ -51,7 +51,6 @@
   },
   "paths": {
     "generated_folder": "genereted",
-    "model_save_name": "model.pt",
-    "graph_html": "graph.html"
+    "model_save_name": "model.pt"
   }
 }
