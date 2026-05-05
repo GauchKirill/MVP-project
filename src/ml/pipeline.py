@@ -190,12 +190,12 @@ def print_results(results, extractor):
         print(f"Средняя доля потерь (фиктивный путь): {mean_loss:.3f}")
 
     edge_utils = results['edge_utilization']
-    overloaded = np.where(edge_utils > 0.95)[0]
-    high_load = np.where((edge_utils > 0.7) & (edge_utils <= 0.95))[0]
+    overloaded = np.where(edge_utils > 1.0)[0]
+    high_load = np.where((edge_utils > 0.95) & (edge_utils <= 1.0))[0]
 
     print(f"\nАнализ загрузки рёбер:")
-    print(f"  - Перегружено (>95%): {len(overloaded)}")
-    print(f"  - Высокая загрузка (70-95%): {len(high_load)}")
+    print(f"  - Перегружено (>100%): {len(overloaded)}")
+    print(f"  - Высокая загрузка (95-100%): {len(high_load)}")
 
     if len(overloaded) > 0:
         print(f"\n !! Перегруженные рёбра:")
