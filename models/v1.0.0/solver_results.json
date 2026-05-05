@@ -1,0 +1,1321 @@
+{
+  "source": "Solver",
+  "summary": {
+    "total_demanded": 31759.09,
+    "total_delivered": 25933.2,
+    "total_shortage": 5825.89,
+    "delivery_ratio": 81.7
+  },
+  "requests": [
+    {
+      "source": "A",
+      "consumer": "1",
+      "demanded": 738.0,
+      "delivered": 145.59,
+      "shortage": 592.41,
+      "delivery_pct": 19.7
+    },
+    {
+      "source": "A",
+      "consumer": "3",
+      "demanded": 1200.0,
+      "delivered": 111.66,
+      "shortage": 1088.34,
+      "delivery_pct": 9.3
+    },
+    {
+      "source": "A",
+      "consumer": "4",
+      "demanded": 420.0,
+      "delivered": 420.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "A",
+      "consumer": "5",
+      "demanded": 42.2,
+      "delivered": 42.2,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "A",
+      "consumer": "6",
+      "demanded": 735.0,
+      "delivered": 735.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "A",
+      "consumer": "7",
+      "demanded": 379.0,
+      "delivered": 379.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "A",
+      "consumer": "10",
+      "demanded": 40.0,
+      "delivered": 39.96,
+      "shortage": 0.04,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "A",
+      "consumer": "38",
+      "demanded": 370.0,
+      "delivered": 154.39,
+      "shortage": 215.61,
+      "delivery_pct": 41.7
+    },
+    {
+      "source": "B",
+      "consumer": "1",
+      "demanded": 1074.7,
+      "delivered": 205.44,
+      "shortage": 869.26,
+      "delivery_pct": 19.1
+    },
+    {
+      "source": "B",
+      "consumer": "3",
+      "demanded": 403.39,
+      "delivered": 403.39,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "38",
+      "demanded": 9.66,
+      "delivered": 9.67,
+      "shortage": -0.01,
+      "delivery_pct": 100.1
+    },
+    {
+      "source": "B",
+      "consumer": "9",
+      "demanded": 26.72,
+      "delivered": 26.72,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "10",
+      "demanded": 8.96,
+      "delivered": 8.95,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "12",
+      "demanded": 50.5,
+      "delivered": 50.49,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "14",
+      "demanded": 61.71,
+      "delivered": 61.69,
+      "shortage": 0.03,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "15",
+      "demanded": 5.49,
+      "delivered": 0.09,
+      "shortage": 5.4,
+      "delivery_pct": 1.6
+    },
+    {
+      "source": "B",
+      "consumer": "17",
+      "demanded": 6.75,
+      "delivered": 6.76,
+      "shortage": -0.01,
+      "delivery_pct": 100.1
+    },
+    {
+      "source": "B",
+      "consumer": "19",
+      "demanded": 41.53,
+      "delivered": 41.53,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "16",
+      "demanded": 111.22,
+      "delivered": 111.22,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "28",
+      "demanded": 69.54,
+      "delivered": 69.54,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "21",
+      "demanded": 37.42,
+      "delivered": 37.42,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "23",
+      "demanded": 131.84,
+      "delivered": 131.84,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "B",
+      "consumer": "29",
+      "demanded": 45.57,
+      "delivered": 45.57,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "C",
+      "consumer": "3",
+      "demanded": 377.1,
+      "delivered": 342.14,
+      "shortage": 34.96,
+      "delivery_pct": 90.7
+    },
+    {
+      "source": "C",
+      "consumer": "10",
+      "demanded": 63.5,
+      "delivered": 63.44,
+      "shortage": 0.06,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "C",
+      "consumer": "12",
+      "demanded": 298.9,
+      "delivered": 298.72,
+      "shortage": 0.18,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "C",
+      "consumer": "15",
+      "demanded": 17.4,
+      "delivered": 17.41,
+      "shortage": -0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "C",
+      "consumer": "17",
+      "demanded": 134.1,
+      "delivered": 134.1,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "C",
+      "consumer": "25",
+      "demanded": 27.55,
+      "delivered": 27.54,
+      "shortage": 0.01,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "C",
+      "consumer": "22",
+      "demanded": 23.35,
+      "delivered": 23.34,
+      "shortage": 0.01,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "C",
+      "consumer": "24",
+      "demanded": 90.9,
+      "delivered": 90.74,
+      "shortage": 0.16,
+      "delivery_pct": 99.8
+    },
+    {
+      "source": "C",
+      "consumer": "26",
+      "demanded": 3.6,
+      "delivered": 3.57,
+      "shortage": 0.03,
+      "delivery_pct": 99.0
+    },
+    {
+      "source": "C",
+      "consumer": "38",
+      "demanded": 486.3,
+      "delivered": 247.19,
+      "shortage": 239.11,
+      "delivery_pct": 50.8
+    },
+    {
+      "source": "C",
+      "consumer": "31",
+      "demanded": 39.5,
+      "delivered": 39.42,
+      "shortage": 0.08,
+      "delivery_pct": 99.8
+    },
+    {
+      "source": "C",
+      "consumer": "1",
+      "demanded": 1.4,
+      "delivered": 1.41,
+      "shortage": -0.01,
+      "delivery_pct": 100.4
+    },
+    {
+      "source": "C",
+      "consumer": "34",
+      "demanded": 10.3,
+      "delivered": 10.28,
+      "shortage": 0.02,
+      "delivery_pct": 99.8
+    },
+    {
+      "source": "C",
+      "consumer": "37",
+      "demanded": 66.1,
+      "delivered": 66.1,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "1",
+      "demanded": 875.0,
+      "delivered": 366.83,
+      "shortage": 508.17,
+      "delivery_pct": 41.9
+    },
+    {
+      "source": "D",
+      "consumer": "3",
+      "demanded": 185.43,
+      "delivered": 185.44,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "14",
+      "demanded": 32.48,
+      "delivered": 32.43,
+      "shortage": 0.05,
+      "delivery_pct": 99.8
+    },
+    {
+      "source": "D",
+      "consumer": "15",
+      "demanded": 14.75,
+      "delivered": 14.75,
+      "shortage": -0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "16",
+      "demanded": 6.88,
+      "delivered": 6.85,
+      "shortage": 0.03,
+      "delivery_pct": 99.6
+    },
+    {
+      "source": "D",
+      "consumer": "18",
+      "demanded": 207.04,
+      "delivered": 207.01,
+      "shortage": 0.03,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "17",
+      "demanded": 51.7,
+      "delivered": 51.7,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "22",
+      "demanded": 11.36,
+      "delivered": 11.32,
+      "shortage": 0.03,
+      "delivery_pct": 99.7
+    },
+    {
+      "source": "D",
+      "consumer": "20",
+      "demanded": 92.88,
+      "delivered": 92.88,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "25",
+      "demanded": 12.44,
+      "delivered": 12.4,
+      "shortage": 0.04,
+      "delivery_pct": 99.7
+    },
+    {
+      "source": "D",
+      "consumer": "24",
+      "demanded": 14.01,
+      "delivered": 14.01,
+      "shortage": -0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "D",
+      "consumer": "27",
+      "demanded": 53.04,
+      "delivered": 53.04,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "E",
+      "consumer": "18",
+      "demanded": 108.32,
+      "delivered": 108.27,
+      "shortage": 0.05,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "F",
+      "consumer": "1",
+      "demanded": 1650.0,
+      "delivered": 1650.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "1",
+      "demanded": 911.0,
+      "delivered": 911.0,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "30",
+      "demanded": 225.0,
+      "delivered": 224.99,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "31",
+      "demanded": 114.94,
+      "delivered": 114.94,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "8",
+      "demanded": 222.0,
+      "delivered": 222.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "33",
+      "demanded": 237.0,
+      "delivered": 237.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "17",
+      "demanded": 311.72,
+      "delivered": 160.62,
+      "shortage": 151.11,
+      "delivery_pct": 51.5
+    },
+    {
+      "source": "G",
+      "consumer": "24",
+      "demanded": 174.5,
+      "delivered": 174.5,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "26",
+      "demanded": 37.0,
+      "delivered": 36.99,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "3",
+      "demanded": 117.02,
+      "delivered": 117.02,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "15",
+      "demanded": 168.74,
+      "delivered": 150.71,
+      "shortage": 18.03,
+      "delivery_pct": 89.3
+    },
+    {
+      "source": "G",
+      "consumer": "38",
+      "demanded": 589.64,
+      "delivered": 589.65,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "37",
+      "demanded": 578.73,
+      "delivered": 578.73,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "G",
+      "consumer": "34",
+      "demanded": 52.7,
+      "delivered": 52.68,
+      "shortage": 0.02,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "2",
+      "demanded": 1100.0,
+      "delivered": 1100.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "32",
+      "demanded": 42.24,
+      "delivered": 42.24,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "37",
+      "demanded": 679.81,
+      "delivered": 679.81,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "15",
+      "demanded": 63.4,
+      "delivered": 63.4,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "24",
+      "demanded": 47.09,
+      "delivered": 47.09,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "3",
+      "demanded": 74.0,
+      "delivered": 74.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "17",
+      "demanded": 87.0,
+      "delivered": 87.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "13",
+      "demanded": 72.4,
+      "delivered": 72.4,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "H",
+      "consumer": "38",
+      "demanded": 139.0,
+      "delivered": 139.0,
+      "shortage": -0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "I",
+      "consumer": "14",
+      "demanded": 470.7,
+      "delivered": 470.69,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "I",
+      "consumer": "15",
+      "demanded": 14.89,
+      "delivered": 14.89,
+      "shortage": -0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "I",
+      "consumer": "35",
+      "demanded": 121.36,
+      "delivered": 121.36,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "I",
+      "consumer": "36",
+      "demanded": 103.84,
+      "delivered": 103.84,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "I",
+      "consumer": "37",
+      "demanded": 52.0,
+      "delivered": 51.99,
+      "shortage": 0.01,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "J",
+      "consumer": "37",
+      "demanded": 92.2,
+      "delivered": 92.04,
+      "shortage": 0.16,
+      "delivery_pct": 99.8
+    },
+    {
+      "source": "K",
+      "consumer": "1",
+      "demanded": 650.6,
+      "delivered": 650.6,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "K",
+      "consumer": "34",
+      "demanded": 30.0,
+      "delivered": 29.96,
+      "shortage": 0.04,
+      "delivery_pct": 99.9
+    },
+    {
+      "source": "K",
+      "consumer": "38",
+      "demanded": 19.62,
+      "delivered": 19.62,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "L",
+      "consumer": "1",
+      "demanded": 5454.0,
+      "delivered": 5454.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "L",
+      "consumer": "38",
+      "demanded": 24.0,
+      "delivered": 24.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "M",
+      "consumer": "2",
+      "demanded": 2400.0,
+      "delivered": 1994.65,
+      "shortage": 405.35,
+      "delivery_pct": 83.1
+    },
+    {
+      "source": "M",
+      "consumer": "12",
+      "demanded": 13.5,
+      "delivered": 13.5,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "M",
+      "consumer": "11",
+      "demanded": 78.91,
+      "delivered": 78.91,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "N",
+      "consumer": "1",
+      "demanded": 1800.0,
+      "delivered": 1774.82,
+      "shortage": 25.18,
+      "delivery_pct": 98.6
+    },
+    {
+      "source": "O",
+      "consumer": "1",
+      "demanded": 1700.0,
+      "delivered": 1700.0,
+      "shortage": 0.0,
+      "delivery_pct": 100.0
+    },
+    {
+      "source": "P",
+      "consumer": "1",
+      "demanded": 1700.0,
+      "delivered": 36.01,
+      "shortage": 1663.99,
+      "delivery_pct": 2.1
+    },
+    {
+      "source": "P",
+      "consumer": "3",
+      "demanded": 8.0,
+      "delivered": 8.0,
+      "shortage": -0.0,
+      "delivery_pct": 100.1
+    },
+    {
+      "source": "P",
+      "consumer": "15",
+      "demanded": 8.0,
+      "delivered": 0.1,
+      "shortage": 7.9,
+      "delivery_pct": 1.2
+    },
+    {
+      "source": "P",
+      "consumer": "38",
+      "demanded": 8.0,
+      "delivered": 8.01,
+      "shortage": -0.01,
+      "delivery_pct": 100.1
+    }
+  ],
+  "edges": [
+    {
+      "edge": "P ↔ XI.",
+      "capacity": 2670.3,
+      "flow": 1341.39,
+      "utilization": 50.2
+    },
+    {
+      "edge": "XVIII. ↔ v19",
+      "capacity": 4878.2,
+      "flow": 1156.2,
+      "utilization": 23.7
+    },
+    {
+      "edge": "XVIII. ↔ v18",
+      "capacity": 3644.6,
+      "flow": 1932.68,
+      "utilization": 53.0
+    },
+    {
+      "edge": "X. ↔ IX.",
+      "capacity": 12900.9,
+      "flow": 7428.4,
+      "utilization": 57.6
+    },
+    {
+      "edge": "IX. ↔ v14",
+      "capacity": 8991.7,
+      "flow": 4427.35,
+      "utilization": 49.2
+    },
+    {
+      "edge": "C ↔ X.",
+      "capacity": 4503.4,
+      "flow": 1289.76,
+      "utilization": 28.6
+    },
+    {
+      "edge": "M ↔ X.",
+      "capacity": 2612.5,
+      "flow": 2214.45,
+      "utilization": 84.8
+    },
+    {
+      "edge": "IX. ↔ I.",
+      "capacity": 6269.8,
+      "flow": 6267.09,
+      "utilization": 100.0
+    },
+    {
+      "edge": "XI. ↔ v16",
+      "capacity": 5901.7,
+      "flow": 2880.79,
+      "utilization": 48.8
+    },
+    {
+      "edge": "I. ↔ v7",
+      "capacity": 11578.7,
+      "flow": 9227.21,
+      "utilization": 79.7
+    },
+    {
+      "edge": "II. ↔ I.",
+      "capacity": 7057.1,
+      "flow": 4507.49,
+      "utilization": 63.9
+    },
+    {
+      "edge": "III. ↔ v22",
+      "capacity": 20757.7,
+      "flow": 10637.91,
+      "utilization": 51.2
+    },
+    {
+      "edge": "v22 ↔ v21",
+      "capacity": 20757.7,
+      "flow": 10620.42,
+      "utilization": 51.2
+    },
+    {
+      "edge": "v21 ↔ IV.",
+      "capacity": 20757.7,
+      "flow": 10383.53,
+      "utilization": 50.0
+    },
+    {
+      "edge": "IV. ↔ XVI.",
+      "capacity": 20757.7,
+      "flow": 12424.95,
+      "utilization": 59.9
+    },
+    {
+      "edge": "XVII. ↔ IV.",
+      "capacity": 12672.7,
+      "flow": 5577.02,
+      "utilization": 44.0
+    },
+    {
+      "edge": "V. ↔ v5",
+      "capacity": 7322.4,
+      "flow": 5534.78,
+      "utilization": 75.6
+    },
+    {
+      "edge": "v5 ↔ XVII.",
+      "capacity": 7322.4,
+      "flow": 5577.02,
+      "utilization": 76.2
+    },
+    {
+      "edge": "VI. ↔ v3",
+      "capacity": 5034.8,
+      "flow": 4808.95,
+      "utilization": 95.5
+    },
+    {
+      "edge": "v3 ↔ v4",
+      "capacity": 5034.8,
+      "flow": 4930.31,
+      "utilization": 97.9
+    },
+    {
+      "edge": "v4 ↔ V.",
+      "capacity": 5034.8,
+      "flow": 5034.15,
+      "utilization": 100.0
+    },
+    {
+      "edge": "V. ↔ VIII.",
+      "capacity": 1614.1,
+      "flow": 1376.49,
+      "utilization": 85.3
+    },
+    {
+      "edge": "J ↔ VIII.",
+      "capacity": 3573.7,
+      "flow": 92.19,
+      "utilization": 2.6
+    },
+    {
+      "edge": "37 ↔ VIII.",
+      "capacity": "inf",
+      "flow": 1468.68,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XVI. ↔ v2",
+      "capacity": 27945.0,
+      "flow": 12915.98,
+      "utilization": 46.2
+    },
+    {
+      "edge": "v2 ↔ v1",
+      "capacity": 27945.0,
+      "flow": 17181.88,
+      "utilization": 61.5
+    },
+    {
+      "edge": "v1 ↔ 1",
+      "capacity": 27945.0,
+      "flow": 15990.35,
+      "utilization": 57.2
+    },
+    {
+      "edge": "XII. ↔ v9",
+      "capacity": 10516.7,
+      "flow": 2241.93,
+      "utilization": 21.3
+    },
+    {
+      "edge": "v9 ↔ v8",
+      "capacity": 10516.7,
+      "flow": 2149.17,
+      "utilization": 20.4
+    },
+    {
+      "edge": "v8 ↔ VI.",
+      "capacity": 10516.7,
+      "flow": 2143.31,
+      "utilization": 20.4
+    },
+    {
+      "edge": "VI. ↔ 15",
+      "capacity": 6207.4,
+      "flow": 379.41,
+      "utilization": 6.1
+    },
+    {
+      "edge": "16 ↔ 15",
+      "capacity": "inf",
+      "flow": 118.07,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XV. ↔ XIV.",
+      "capacity": 11089.0,
+      "flow": 4150.04,
+      "utilization": 37.4
+    },
+    {
+      "edge": "XIV. ↔ v13",
+      "capacity": 14548.4,
+      "flow": 4161.88,
+      "utilization": 28.6
+    },
+    {
+      "edge": "v13 ↔ v12",
+      "capacity": 14548.4,
+      "flow": 4030.04,
+      "utilization": 27.7
+    },
+    {
+      "edge": "v12 ↔ v11",
+      "capacity": 14548.4,
+      "flow": 3989.55,
+      "utilization": 27.4
+    },
+    {
+      "edge": "v11 ↔ v10",
+      "capacity": 14548.4,
+      "flow": 3954.94,
+      "utilization": 27.2
+    },
+    {
+      "edge": "v10 ↔ v20",
+      "capacity": 14548.4,
+      "flow": 3917.51,
+      "utilization": 26.9
+    },
+    {
+      "edge": "v20 ↔ XII.",
+      "capacity": 14548.4,
+      "flow": 3848.12,
+      "utilization": 26.5
+    },
+    {
+      "edge": "XII. ↔ XIII.",
+      "capacity": 5087.7,
+      "flow": 1758.94,
+      "utilization": 34.6
+    },
+    {
+      "edge": "XIII. ↔ 13",
+      "capacity": 1571.2,
+      "flow": 677.14,
+      "utilization": 43.1
+    },
+    {
+      "edge": "XIII. ↔ 24",
+      "capacity": 1864.6,
+      "flow": 326.34,
+      "utilization": 17.5
+    },
+    {
+      "edge": "13 ↔ 25",
+      "capacity": 1381.1,
+      "flow": 39.94,
+      "utilization": 2.9
+    },
+    {
+      "edge": "O ↔ VII.",
+      "capacity": 1762.5,
+      "flow": 1324.26,
+      "utilization": 75.1
+    },
+    {
+      "edge": "N ↔ VII.",
+      "capacity": 2529.9,
+      "flow": 1402.16,
+      "utilization": 55.4
+    },
+    {
+      "edge": "VII. ↔ VI.",
+      "capacity": 3501.2,
+      "flow": 2726.41,
+      "utilization": 77.9
+    },
+    {
+      "edge": "1 ↔ 2",
+      "capacity": "inf",
+      "flow": 3094.65,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v1 ↔ 38",
+      "capacity": "inf",
+      "flow": 1191.53,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v2 ↔ L",
+      "capacity": "inf",
+      "flow": 4265.9,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v19 ↔ 6",
+      "capacity": 4878.2,
+      "flow": 1114.0,
+      "utilization": 22.8
+    },
+    {
+      "edge": "v18 ↔ v17",
+      "capacity": 3644.6,
+      "flow": 1512.68,
+      "utilization": 41.5
+    },
+    {
+      "edge": "v17 ↔ XI.",
+      "capacity": 3644.6,
+      "flow": 1539.4,
+      "utilization": 42.2
+    },
+    {
+      "edge": "v14 ↔ XV.",
+      "capacity": 8991.7,
+      "flow": 4206.95,
+      "utilization": 46.8
+    },
+    {
+      "edge": "v15 ↔ X.",
+      "capacity": 5901.7,
+      "flow": 2992.13,
+      "utilization": 50.7
+    },
+    {
+      "edge": "v15 ↔ v16",
+      "capacity": 5901.7,
+      "flow": 2959.7,
+      "utilization": 50.2
+    },
+    {
+      "edge": "v7 ↔ v6",
+      "capacity": 11578.7,
+      "flow": 9094.42,
+      "utilization": 78.5
+    },
+    {
+      "edge": "30 ↔ v6",
+      "capacity": "inf",
+      "flow": 224.99,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v7 ↔ 31",
+      "capacity": "inf",
+      "flow": 154.36,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v6 ↔ III.",
+      "capacity": 11578.7,
+      "flow": 8869.53,
+      "utilization": 76.6
+    },
+    {
+      "edge": "K ↔ XVI.",
+      "capacity": "inf",
+      "flow": 550.98,
+      "utilization": 0.0
+    },
+    {
+      "edge": "H ↔ III.",
+      "capacity": "inf",
+      "flow": 2074.88,
+      "utilization": 0.0
+    },
+    {
+      "edge": "F ↔ II.",
+      "capacity": "inf",
+      "flow": 1285.31,
+      "utilization": 0.0
+    },
+    {
+      "edge": "G ↔ II.",
+      "capacity": "inf",
+      "flow": 3222.18,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v21 ↔ 33",
+      "capacity": "inf",
+      "flow": 237.0,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v22 ↔ 34",
+      "capacity": "inf",
+      "flow": 92.92,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v5 ↔ 32",
+      "capacity": "inf",
+      "flow": 42.24,
+      "utilization": 0.0
+    },
+    {
+      "edge": "I ↔ V.",
+      "capacity": "inf",
+      "flow": 761.12,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v4 ↔ 36",
+      "capacity": "inf",
+      "flow": 103.84,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v3 ↔ 35",
+      "capacity": "inf",
+      "flow": 121.36,
+      "utilization": 0.0
+    },
+    {
+      "edge": "VI. ↔ 27",
+      "capacity": "inf",
+      "flow": 53.04,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v8 ↔ 19",
+      "capacity": "inf",
+      "flow": 41.53,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v9 ↔ 20",
+      "capacity": "inf",
+      "flow": 92.88,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XII. ↔ 3",
+      "capacity": "inf",
+      "flow": 1241.64,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XIII. ↔ 17",
+      "capacity": "inf",
+      "flow": 440.17,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XIII. ↔ 18",
+      "capacity": "inf",
+      "flow": 315.28,
+      "utilization": 0.0
+    },
+    {
+      "edge": "13 ↔ 14",
+      "capacity": "inf",
+      "flow": 564.81,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v20 ↔ 28",
+      "capacity": "inf",
+      "flow": 69.54,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v10 ↔ 21",
+      "capacity": "inf",
+      "flow": 37.42,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v11 ↔ 22",
+      "capacity": "inf",
+      "flow": 34.66,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v12 ↔ 26",
+      "capacity": "inf",
+      "flow": 40.55,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v13 ↔ 23",
+      "capacity": "inf",
+      "flow": 131.84,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XIV. ↔ E",
+      "capacity": "inf",
+      "flow": 108.29,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XIV. ↔ 29",
+      "capacity": "inf",
+      "flow": 45.57,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XV. ↔ D",
+      "capacity": "inf",
+      "flow": 1260.63,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v14 ↔ 8",
+      "capacity": "inf",
+      "flow": 222.0,
+      "utilization": 0.0
+    },
+    {
+      "edge": "X. ↔ 12",
+      "capacity": "inf",
+      "flow": 362.71,
+      "utilization": 0.0
+    },
+    {
+      "edge": "X. ↔ B",
+      "capacity": "inf",
+      "flow": 1650.82,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v15 ↔ 10",
+      "capacity": "inf",
+      "flow": 112.36,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v16 ↔ 11",
+      "capacity": "inf",
+      "flow": 78.91,
+      "utilization": 0.0
+    },
+    {
+      "edge": "9 ↔ v17",
+      "capacity": "inf",
+      "flow": 26.72,
+      "utilization": 0.0
+    },
+    {
+      "edge": "4 ↔ v18",
+      "capacity": "inf",
+      "flow": 420.0,
+      "utilization": 0.0
+    },
+    {
+      "edge": "XVIII. ↔ A",
+      "capacity": "inf",
+      "flow": 3088.88,
+      "utilization": 0.0
+    },
+    {
+      "edge": "v19 ↔ 5",
+      "capacity": "inf",
+      "flow": 42.2,
+      "utilization": 0.0
+    },
+    {
+      "edge": "6 ↔ 7",
+      "capacity": "inf",
+      "flow": 379.0,
+      "utilization": 0.0
+    }
+  ]
+}
